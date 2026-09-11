@@ -1,0 +1,1915 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tune-o-matic — guitar tuner &amp; intonation setup in your browser</title>
+<meta name="description" content="Free browser tool: a chromatic-quality guitar tuner (6, 7 and 12-string; open and drop tunings; 432–440Hz reference) plus a step-by-step intonation wizard for tune-o-matic and adjustable bridges. Nothing is uploaded.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='4' width='24' height='8' rx='2' fill='%23e8a33d'/%3E%3Crect x='6' y='16' width='3' height='12' fill='%23e8a33d'/%3E%3Crect x='14' y='16' width='3' height='12' fill='%23e8a33d'/%3E%3Crect x='23' y='16' width='3' height='12' fill='%23e8a33d'/%3E%3C/svg%3E">
+<style>
+  :root, [data-theme="dark"] {
+    --bg: #14161a;
+    --panel: #1d2026;
+    --panel2: #232730;
+    --line: #2e333d;
+    --fg: #e8e6e0;
+    --fg-dim: #9aa0ab;
+    --fg-faint: #6b7280;
+    --amber: #e8a33d;
+    --amber-dim: #a97a2f;
+    --green: #4ade80;
+    --red: #f87171;
+    --radius: 14px;
+    --wave-bg: #17191e;
+    --wave-stroke: #8a6a33;
+    --led: #ff2a1a;
+    --led-dim: rgba(255,42,26,0.10);
+  }
+  [data-theme="light"] {
+    --bg: #e9e2d3;
+    --panel: #f5efe2;
+    --panel2: #eae2cf;
+    --line: #d8cdb4;
+    --fg: #2b2822;
+    --fg-dim: #6b6252;
+    --fg-faint: #988e79;
+    --amber: #b3720f;
+    --amber-dim: #8a5a0e;
+    --green: #1a7f43;
+    --red: #b3372c;
+    --wave-bg: #ddd4bf;
+    --wave-stroke: #a5702a;
+    --led: #ff2a1a;
+    --led-dim: rgba(255,42,26,0.10);
+  }
+  body { transition: background .25s, color .25s; }
+  .card, .chip, .hint, select, .sel, input.sel, .meter, .lockwrap, canvas.wave { transition: background .25s, border-color .25s; }
+
+  /* ---- theme toggle (iPhone-style) ---- */
+  .themeswitch {
+    position: fixed; top: 14px; right: 14px; z-index: 100;
+    width: 54px; height: 32px; border-radius: 16px;
+    background: var(--panel2); border: 1px solid var(--line);
+    cursor: pointer; padding: 0;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.25);
+  }
+  .themeswitch .knob {
+    position: absolute; top: 2px; left: 2px; width: 26px; height: 26px;
+    border-radius: 50%; background: linear-gradient(145deg, #fdf6e3, #d8cdb4);
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    transition: left .18s cubic-bezier(.3,.9,.4,1.2), background .18s;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  [data-theme="dark"] .themeswitch .knob { left: 24px; background: linear-gradient(145deg, #3a4150, #232730); }
+  .themeswitch .knob::after { content: "\2600"; color: #7a5a10; }          /* sun in light */
+  [data-theme="dark"] .themeswitch .knob::after { content: "\263D"; color: #cfd6e0; }  /* moon in dark */
+
+  /* ---- meter face (raster art + overlay) ---- */
+  .meterface { position: relative; max-width: 430px; margin: 14px auto 0; }
+  .meterface .face-img { width: 100%; display: block; border-radius: 6px; }
+  [data-theme="dark"] .face-img.light-only { display: none; }
+  [data-theme="light"] .face-img.dark-only { display: none; }
+  .meterface svg.gauge-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* 7-seg LED note window, recessed into the face */
+  .ledwin {
+    position: absolute; left: 63%; top: 43.5%; width: 13%; height: 11%;
+    background: linear-gradient(180deg, #100604, #1c0c06);
+    border-radius: 6px; border: 2px solid rgba(0,0,0,.85);
+    box-shadow: inset 0 3px 8px rgba(0,0,0,.95), inset 0 -1px 2px rgba(255,180,90,.12), 0 1px 1px rgba(255,220,150,.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ledwin svg { width: 94%; height: 84%; }
+  .ledseg { filter: drop-shadow(0 0 0.8px var(--led)); }
+  .ledseg { fill: var(--led); }
+  .ledseg.off { fill: var(--led); opacity: 0.05; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: var(--fg);
+    background:
+      radial-gradient(1200px 500px at 50% -10%, #1b1f26 0%, var(--bg) 60%) var(--bg);
+    background-attachment: scroll;
+    min-height: 100vh;
+    -webkit-transform: translateZ(0);  /* force iOS repaint of the gradient after refresh */
+    line-height: 1.55;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 28px 18px 60px; }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand h1 { font-size: 22px; letter-spacing: 0.02em; font-weight: 700; }
+  .brand h1 .dot { color: var(--amber); }
+  .badge {
+    font-size: 11px; color: var(--fg-dim); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+  }
+  @media (max-width: 480px) { .badge { display: none; } }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 22px; }
+  .tab {
+    flex: 1; text-align: center; font: inherit; font-size: 15px; font-weight: 600;
+    color: var(--fg-dim); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 11px 8px; cursor: pointer;
+    transition: color .12s, border-color .12s;
+  }
+  .tab:hover { color: var(--fg); }
+  .tab.active { color: var(--amber); border-color: var(--amber-dim); box-shadow: 0 0 0 1px var(--amber-dim); }
+  .tab .sub { display: block; font-size: 11px; font-weight: 400; color: var(--fg-faint); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 22px 26px; margin-bottom: 16px;
+  }
+  @media (max-width: 480px) { .card { padding: 18px 16px 22px; } }
+
+  h2 { font-size: 19px; margin-bottom: 6px; font-weight: 700; }
+  .lead { color: var(--fg-dim); font-size: 15px; margin-bottom: 16px; }
+  p + p { margin-top: 10px; }
+  ul.clean { list-style: none; margin: 12px 0; }
+  ul.clean li { padding-left: 26px; position: relative; margin-bottom: 9px; color: var(--fg-dim); font-size: 14.5px; }
+  ul.clean li::before { content: ""; position: absolute; left: 6px; top: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+  ul.clean li strong { color: var(--fg); }
+
+  .btn {
+    display: inline-block; appearance: none; border: none; cursor: pointer;
+    font: inherit; font-weight: 600; font-size: 15.5px;
+    background: var(--amber); color: #14161a;
+    padding: 12px 22px; border-radius: 10px; transition: transform .06s, box-shadow .15s;
+  }
+  .btn:hover { box-shadow: 0 0 0 4px rgba(232,163,61,0.18); }
+  .btn:active { transform: translateY(1px); }
+  .btn.big { font-size: 17px; padding: 14px 26px; }
+  .btn.ghost {
+    background: transparent; color: var(--fg-dim); border: 1px solid var(--line);
+    font-weight: 500; padding: 11px 18px;
+  }
+  .btn.ghost:hover { color: var(--fg); box-shadow: none; border-color: var(--fg-faint); }
+  .btn.demo { background: transparent; color: var(--amber); border: 1px dashed var(--amber-dim); font-weight: 500; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  select, .sel {
+    width: 100%; font: inherit; font-size: 15px; color: var(--fg);
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 11px 12px; outline: none;
+  }
+  select:focus { border-color: var(--amber-dim); }
+  label.lbl { display: block; font-size: 12.5px; color: var(--fg-faint); text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 6px; font-weight: 600; }
+
+  .meter { height: 10px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; margin-top: 8px; }
+  .meter > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--green), var(--amber) 70%, var(--red)); transition: width .08s linear; }
+  .meterlbl { font-size: 12.5px; color: var(--fg-faint); margin-top: 6px; min-height: 17px; }
+
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 56px; padding: 7px 10px 6px; border-radius: 10px;
+    background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--fg-dim);
+    cursor: pointer; user-select: none;
+  }
+  .chip .nm { font-weight: 700; font-size: 14px; color: var(--fg); letter-spacing: .03em; }
+  .chip .st { font-size: 10.5px; min-height: 13px; }
+  .chip.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
+  .chip.active .nm { color: var(--amber); }
+  .chip.done { border-color: #2b5e41; }
+  .chip.done .st { color: var(--green); }
+  .chip.pinned { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg-faint); }
+  .chip.auto { font-weight: 600; }
+  .chip.flash { animation: flash .6s ease-out; }
+  @keyframes flash { 0% { background: #2b5e41; } 100% { background: var(--panel); } }
+
+  .steplabel { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--amber); font-weight: 700; margin-bottom: 10px; }
+  .instruction { font-size: 19.5px; font-weight: 600; line-height: 1.4; }
+  .instruction .strname { color: var(--amber); }
+  .sub { color: var(--fg-dim); font-size: 14.5px; margin-top: 8px; }
+  details.why { margin-top: 14px; font-size: 13.5px; color: var(--fg-dim); }
+  details.why summary { cursor: pointer; color: var(--fg-faint); font-weight: 600; }
+  details.why p { margin-top: 8px; }
+
+  .tuner { text-align: center; margin: 10px 0 4px; }
+  .readout { margin-top: 8px; }
+  .cents {
+    font-size: 46px; font-weight: 700; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em; line-height: 1;
+  }
+  .cents small { font-size: 22px; font-weight: 600; color: var(--fg-dim); }
+  .centsword { font-size: 13px; color: var(--fg-dim); margin-top: 4px; min-height: 18px; }
+  .detnote { font-size: 13.5px; color: var(--fg-faint); margin-top: 2px; font-variant-numeric: tabular-nums; min-height: 18px; text-transform: none; }
+  .lockwrap { max-width: 340px; margin: 8px auto 0; height: 5px; border-radius: 3px; background: var(--panel2); overflow: hidden; }
+  .lockwrap > div { height: 100%; width: 0%; background: var(--green); transition: width .1s linear; }
+
+  canvas.wave { width: 100%; height: 46px; display: block; margin-top: 14px; border-radius: 8px; background: var(--wave-bg); }
+
+  .coffee {
+    margin-top: 16px; padding: 12px 14px; border-radius: 10px;
+    background: var(--panel2); border: 1px solid var(--amber-dim);
+    font-size: 14.5px; color: var(--fg-dim);
+  }
+  .coffee a { color: var(--amber); font-weight: 600; }
+
+  .hint {
+    margin-top: 14px; padding: 11px 14px; border-radius: 10px; font-size: 14.5px;
+    background: var(--panel2); border: 1px solid var(--line); display: none;
+  }
+  .hint.show { display: block; }
+  .hint.warn { border-color: #7a5a2f; color: #e6c07a; }
+  .hint.ok { border-color: #2b5e41; color: #86e2ad; }
+
+  .rounds { margin-top: 14px; }
+  .rounds h4 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-faint); margin-bottom: 8px; }
+  .roundrow { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--fg-dim); margin-bottom: 5px; font-variant-numeric: tabular-nums; }
+  .roundrow .rb { height: 7px; border-radius: 4px; background: var(--red); flex: 0 0 auto; }
+  .roundrow .rb.ok { background: var(--green); }
+  .roundrow .who { width: 64px; flex: 0 0 auto; color: var(--fg-faint); }
+
+  .bigverdict { text-align: center; margin: 10px 0 4px; }
+  .bigverdict .v { font-size: 34px; font-weight: 700; }
+  .bigverdict .v.good { color: var(--green); }
+  .bigverdict .t { color: var(--fg-dim); font-size: 14px; margin-top: 4px; }
+
+  table.rep { width: 100%; border-collapse: collapse; margin: 14px 0 4px; font-size: 14.5px; }
+  table.rep th, table.rep td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  table.rep th { color: var(--fg-faint); font-size: 12px; text-transform: uppercase; letter-spacing: .07em; }
+  table.rep td.num { font-variant-numeric: tabular-nums; }
+  table.rep td .ok { color: var(--green); } table.rep td .warn { color: #e6c07a; }
+
+  footer.foot { color: var(--fg-faint); font-size: 12.5px; text-align: center; margin-top: 34px; line-height: 1.7; }
+  footer.foot a { color: var(--fg-dim); }
+
+  .errbox { display: none; margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #2a1e1e; border: 1px solid #6e3b3b; color: #f0a5a5; font-size: 14px; }
+  .errbox.show { display: block; }
+
+  .cfgrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .cfgrow { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <button class="themeswitch" id="themeToggle" title="Toggle light / dark theme" aria-label="Toggle theme"><span class="knob"></span></button>
+
+  <header class="top">
+    <div class="brand"><h1>tune-o-matic<span class="dot">.</span></h1></div>
+    <span class="badge">free · runs 100% in your browser · nothing uploaded</span>
+  </header>
+
+  <!-- ============ WELCOME ============ -->
+  <section class="screen" id="screen-welcome">
+    <div class="card">
+      <h2>Tune. Then intonate.</h2>
+      <p class="lead">A free, guided tool for instrument setup: a tuner for 4, 6, 7 and 12-string instruments — guitars, bass, mandolin, ukulele (standard, drop and open tunings, 432–440Hz reference) — and a step-by-step intonation wizard for tune-o-matic and other adjustable bridges.</p>
+      <ul class="clean">
+        <li><strong>Works with any microphone</strong> — but for best results, plug your instrument straight into the computer via an audio interface: a direct input gives a cleaner, steadier signal, so the needle locks on faster and reads more precisely. Pitch detection happens locally, no audio ever leaves your device.</li>
+        <li><strong>The tuner</strong> auto-detects which string you're playing, tracks every string with checkmarks, and supports common drop and open tunings derived from your chosen A4 reference (432–440Hz).</li>
+        <li><strong>The intonation wizard</strong> walks you through every step — "play the open string… now the 12th-fret harmonic… now fretted… it reads 6¢ sharp, so lengthen the string" — and iterates until every string converges.</li>
+      </ul>
+      <div class="btnrow">
+        <button class="btn big" id="btnStartWizard">Run the tutorial</button>
+        <button class="btn ghost big" id="btnStartTuner">Open the tuner</button>
+        <button class="btn ghost" id="btnResume" style="display:none">Resume wizard session</button>
+      </div>
+      <p class="sub" style="margin-top:8px">The tutorial is fully simulated — no microphone, no audio access, nothing to plug in. Just watch the meter and follow along.</p>
+    </div>
+    <div class="card">
+      <h2 style="font-size:16px">How intonation setup works</h2>
+      <p class="sub" style="margin-top:2px">For each string: <strong style="color:var(--fg)">tune it</strong> → play the <strong style="color:var(--fg)">12th-fret harmonic</strong> (always exactly double the open pitch — our reference) → play the same note <strong style="color:var(--fg)">fretted</strong> (reveals fret-placement error). Fretted sharp → lengthen the string; flat → shorten it. Small saddle turns, retune, repeat, done.</p>
+      <details class="why"><summary>The physics, for the curious</summary>
+        <p>Pressing a string down stretches it slightly, raising its pitch — so a mathematically perfect fret placement would actually sound sharp. Real bridges compensate by making the sounding length slightly longer than the scale length demands, which flattens fretted notes back into equal temperament.</p>
+        <p>The 12th-fret harmonic rings at exactly twice the open string's frequency no matter where the saddle sits, but the 12th-fret <em>fretted</em> note only matches it if the fret sits at the compensated midpoint. Comparing the two is the cleanest way to measure whether your saddle is in the right place.</p>
+        <p>One cent = 1/100th of a semitone. Below ±3¢ nobody can reliably hear the error, so that's our target.</p>
+      </details>
+    </div>
+    <div class="coffee">
+      If you have found this tool useful, buying me a coffee would truly mean the world to me - <a href="https://buymeacoffee.com/ajcrowley" target="_blank" rel="noopener">support development</a>
+    </div>
+  </section>
+
+  <!-- ============ INPUT / SETUP ============ -->
+  <section class="screen" id="screen-input">
+    <div class="tabs">
+      <button class="tab active" id="tabTuner">Tuner</button>
+      <button class="tab" id="tabWizard">Intonation wizard</button>
+    </div>
+    <div class="card">
+      <h2>Choose your input &amp; setup</h2>
+      <p class="lead">Pick where the guitar's sound comes from, your guitar, its tuning, and your reference pitch. An audio interface is the most accurate; a phone or laptop mic works fine in a quiet room.</p>
+      <label class="lbl" for="selDevice">Input device</label>
+      <select id="selDevice" class="sel"><option value="">Default microphone</option></select>
+      <label class="lbl" for="selGuitar">Guitar</label>
+      <select id="selGuitar" class="sel">
+        <option value="4">4-string (bass, mandolin, ukulele)</option>
+        <option value="6">6-string</option>
+        <option value="7">7-string</option>
+        <option value="12">12-string</option>
+      </select>
+      <label class="lbl" for="selTuning">Tuning</label>
+      <select id="selTuning" class="sel"></select>
+      <div class="cfgrow">
+        <div>
+          <label class="lbl" for="selA4">A4 reference</label>
+          <select id="selA4" class="sel"></select>
+        </div>
+        <div id="a4note" style="align-self:end; font-size:12.5px; color:var(--fg-faint); padding-bottom:12px;"></div>
+      </div>
+      <div class="meter"><div id="levelbar"></div></div>
+      <div class="meterlbl" id="levellbl">Waiting for audio…</div>
+      <canvas class="wave" id="wave2"></canvas>
+      <details class="why" style="margin-top:12px" id="sensBox"><summary>Input settings</summary>
+        <label class="lbl" for="selSens">Sensitivity — detection gate</label>
+        <select id="selSens" class="sel">
+          <option value="high">High — quiet signals, low interface gain, gentle picking</option>
+          <option value="normal">Normal (default)</option>
+          <option value="low">Low — strong signals, loud room, ignore bleed</option>
+        </select>
+        <p class="sub" style="margin-top:8px">If notes only register on hard plucks, choose High. The level meter shows what the gate hears: it analyses only while the bar moves at all.</p>
+      </details>
+      <details class="why" style="margin-top:12px" id="advBox"><summary>Advanced options — tolerances</summary>
+        <p class="sub" style="margin:8px 0 4px">All values in cents. Defaults shown in placeholders; leave a field empty to use the defaults. Your values are saved in this browser only. All tuning units are in ¢</p>
+        <div class="cfgrow" style="grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+          <div><label class="lbl" for="advInTune" style="margin-top:2px">Tuner: in-tune window</label><input id="advInTune" class="sel" type="number" step="0.5" min="0.5" max="10" placeholder="3"></div>
+          <div><label class="lbl" for="advPass" style="margin-top:2px">Wizard: pass tolerance</label><input id="advPass" class="sel" type="number" step="0.5" min="0.5" max="10" placeholder="3"></div>
+          <div><label class="lbl" for="advExcel" style="margin-top:2px">Wizard: "excellent" at</label><input id="advExcel" class="sel" type="number" step="0.5" min="0.5" max="5" placeholder="1.5"></div>
+          <div><label class="lbl" for="advTune" style="margin-top:2px">Wizard: open-string tune tol</label><input id="advTune" class="sel" type="number" step="0.5" min="0.5" max="10" placeholder="4"></div>
+          <div><label class="lbl" for="advHarm" style="margin-top:2px">Wizard: harmonic tol</label><input id="advHarm" class="sel" type="number" step="0.5" min="0.5" max="15" placeholder="8"></div>
+          <div><label class="lbl" for="advStable" style="margin-top:2px">Stability hold (ms)</label><input id="advStable" class="sel" type="number" step="50" min="100" max="2000" placeholder="350"></div>
+        </div>
+        <div class="btnrow" style="margin-top:12px">
+          <button class="btn" id="btnAdvSave" style="font-size:14px; padding:9px 16px;">Save tolerances</button>
+          <button class="btn ghost" id="btnAdvReset" style="font-size:14px; padding:9px 16px;">Reset to defaults</button>
+        </div>
+        <p class="sub" id="advStatus" style="margin-top:8px; min-height:16px"></p>
+      </details>
+      <div class="hint warn" id="secureWarn" style="display:none; margin-top:14px;">
+        <strong>Your browser is blocking audio input on this address.</strong> Plain-HTTP LAN addresses aren't "secure contexts", so Chrome/Edge/Firefox won't allow microphone or interface access here — no permission prompt, no Apogee in the device list. Open the app at <code>http://localhost:8088</code> on this machine's browser, or use the public HTTPS link (e.g. https://<span class="pub">…</span>).
+      </div>
+      <div class="errbox" id="inputErr"></div>
+      <div class="btnrow">
+        <button class="btn big" id="btnUseMic">Grant access &amp; listen</button>
+      </div>
+      <div class="btnrow">
+        <button class="btn big" id="btnGoTuner" disabled>Start tuner →</button>
+        <button class="btn ghost big" id="btnGoWizard" disabled>Intonation wizard →</button>
+      </div>
+      <div class="btnrow">
+        <button class="btn demo" id="btnDemo">Watch the simulated tutorial again</button>
+      </div>
+      <p class="sub" id="inputHint" style="margin-top:12px">After granting access, play something — you should see the level meter move and a waveform appear.</p>
+    </div>
+  </section>
+
+  <!-- ============ TUNER ============ -->
+  <section class="screen" id="screen-tuner">
+    <div class="tabs">
+      <button class="tab active" id="tabTuner2">Tuner</button>
+      <button class="tab" id="tabWizard2">Intonation wizard</button>
+    </div>
+    <div class="chips" id="tunerChips"></div>
+    <div class="card">
+      <div class="steplabel" id="tunerLabel"></div>
+      <div class="sub" id="tunerSub">Auto mode: play any string — the needle locks onto the nearest one. Tap a string chip to pin it; tap Auto to release.</div>
+      <div class="tuner">
+        <div class="meterface" id="meterfaceT">
+          <img class="face-img light-only" src="meter-light.png" alt="" draggable="false">
+          <img class="face-img dark-only" src="meter-dark.png" alt="" draggable="false">
+          <svg class="gauge-svg" id="gaugeT" viewBox="0 0 605 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+          <div class="ledwin" id="ledwinT"><svg id="led7T" viewBox="93 0 92 62" preserveAspectRatio="xMidYMid meet"></svg></div>
+        </div>
+        <div class="readout">
+          <div class="cents" id="centsBigT">–<small>¢</small></div>
+          <div class="centsword" id="centsWordT">listening…</div>
+          <div class="detnote" id="detNoteT"></div>
+        </div>
+        <div class="lockwrap"><div id="lockbarT"></div></div>
+      </div>
+      <canvas class="wave" id="waveT"></canvas>
+      <div class="btnrow" style="justify-content:center">
+        <button class="btn ghost" id="btnTunerReset">Clear ✓ marks</button>
+        <button class="btn ghost" id="btnTunerInput">Change setup / device</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WIZARD ============ -->
+  <section class="screen" id="screen-wizard">
+    <div class="tabs">
+      <button class="tab" id="tabTuner3">Tuner</button>
+      <button class="tab active" id="tabWizard3">Intonation wizard</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="card">
+      <div class="steplabel" id="stepLabel">Round 1 · Step 1 of 4</div>
+      <div class="instruction" id="instruction"></div>
+      <div class="sub" id="instrSub"></div>
+
+      <div class="tuner">
+        <div class="meterface" id="meterface">
+          <img class="face-img light-only" src="meter-light.png" alt="" draggable="false">
+          <img class="face-img dark-only" src="meter-dark.png" alt="" draggable="false">
+          <svg class="gauge-svg" id="gauge" viewBox="0 0 605 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+          <div class="ledwin" id="ledwin"><svg id="led7" viewBox="93 0 92 62" preserveAspectRatio="xMidYMid meet"></svg></div>
+        </div>
+        <div class="readout">
+          <div class="cents" id="centsBig">–<small>¢</small></div>
+          <div class="centsword" id="centsWord">listening…</div>
+          <div class="detnote" id="detNote"></div>
+        </div>
+        <div class="lockwrap"><div id="lockbar"></div></div>
+      </div>
+      <canvas class="wave" id="wave"></canvas>
+
+      <div class="hint" id="hint"></div>
+
+      <div class="rounds" id="roundsBox" style="display:none">
+        <h4>This string so far</h4>
+        <div id="roundsList"></div>
+      </div>
+
+      <details class="why" id="whyBox"><summary>Why this step?</summary><p id="whyText"></p></details>
+
+      <div class="btnrow" id="wizardBtns"></div>
+    </div>
+    <div class="btnrow" style="justify-content:center">
+      <button class="btn ghost" id="btnSkip">Skip this string</button>
+      <button class="btn ghost" id="btnRestart2">Start over</button>
+    </div>
+  </section>
+
+  <!-- ============ DONE ============ -->
+  <section class="screen" id="screen-done">
+    <div class="card">
+      <div class="bigverdict">
+        <div class="v" id="verdictBig">Good.</div>
+        <div class="t" id="verdictSub"></div>
+      </div>
+      <table class="rep" id="repTable"></table>
+      <details class="why"><summary>Tips for keeping it right</summary>
+        <p>Intonation shifts as strings stretch and age, and even with temperature and humidity. Re-check after any restring or gauge change — it only takes a few minutes per string once you're comfortable.</p>
+        <p>If one string refuses to converge: check that string's action height (high action makes notes go sharp as you press harder), and look for a worn or misaligned saddle. And remember — after moving a saddle you must retune before re-measuring; the tool walks you through that loop.</p>
+      </details>
+      <div class="btnrow">
+        <button class="btn" id="btnCopy">Copy report</button>
+        <button class="btn ghost" id="btnRestart3">Start over</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    Free forever. All audio processing happens locally in your browser — nothing is recorded, stored, or sent anywhere.<br>
+    Built for players who'd rather do it themselves. tune-o-matic · 2026.<br>
+    <span class="coffee-inline">If you have found this tool useful, buying me a coffee would truly mean the world to me - <a href="https://buymeacoffee.com/ajcrowley" target="_blank" rel="noopener">support development</a></span>
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   tune-o-matic — free client-side tuner + intonation wizard
+   Single file, no dependencies. Audio never leaves the browser.
+   ============================================================ */
+
+/* ---------- music data ---------- */
+const NOTE_NAMES = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+const ACC_PREFS = {
+  sharp: {1: "C\u266f", 3: "D\u266f", 6: "F\u266f", 8: "G\u266f", 10: "A\u266f"},
+  flat:  {1: "D\u266d", 3: "E\u266d", 6: "G\u266d", 8: "A\u266d", 10: "B\u266d"},
+  auto:  {1: "C\u266f", 3: "E\u266d", 6: "F\u266f", 8: "G\u266f", 10: "B\u266d"},
+};
+function midiName(m) {
+  const pc = ((m % 12) + 12) % 12;
+  const pref = CFG.accidental_pref || "auto";
+  const acc = (ACC_PREFS[pref] || ACC_PREFS.auto)[pc];
+  if (acc) return acc + (Math.floor(m / 12) - 1);
+  return ["C","C","D","D","E","F","F","G","G","A","A","B"][pc] + (Math.floor(m / 12) - 1);
+}
+
+/* Every tuning is stored as MIDI numbers (relative to A4=440 semantics);
+   the actual frequency is derived from the selected A4 reference. */
+const TUNINGS = [
+  // 4-string (bass / mandolin / ukulele / tenor instruments)
+  { id: "4-bass",      type: 4, label: "Bass (E A D G)",              midis: [28,33,38,43] },
+  { id: "4-bassdropd", type: 4, label: "Bass Drop D (D A D G)",       midis: [26,33,38,43] },
+  { id: "4-basseb",    type: 4, label: "Bass E♭ (half-step down)",    midis: [27,32,37,42] },
+  { id: "4-bassbead",  type: 4, label: "Bass BEAD (tuned down)",      midis: [23,28,33,38] },
+  { id: "4-mandolin",  type: 4, label: "Mandolin (G D A E)",          midis: [55,62,69,76] },
+  { id: "4-mandolinb", type: 4, label: "Mandolin (G D A E) flat bottom", midis: [54,61,68,75] },
+  { id: "4-ukulele",   type: 4, label: "Ukulele (G C E A, high G)",   midis: [67,60,64,69] },
+  { id: "4-ukulelel",  type: 4, label: "Ukulele (G C E A, low G)",    midis: [55,60,64,69] },
+  { id: "4-baritoneu", type: 4, label: "Baritone Ukulele (D G B E)",  midis: [50,55,59,64] },
+  { id: "4-cello",     type: 4, label: "Cello (C G D A)",             midis: [36,43,50,57] },
+  { id: "4-violin",    type: 4, label: "Violin (G D A E)",            midis: [55,62,69,76] },
+  // 6-string
+  { id: "6-standard", type: 6, label: "Standard (E A D G B E)", midis: [40,45,50,55,59,64] },
+  { id: "6-dropd",    type: 6, label: "Drop D (D A D G B E)",   midis: [38,45,50,55,59,64] },
+  { id: "6-dropcs",   type: 6, label: "Drop C♯ (C♯ G♯ C♯ F♯ A♯ D♯)", midis: [37,44,49,54,58,63] },
+  { id: "6-eb",       type: 6, label: "E♭ Standard (half-step down)", midis: [39,44,49,54,58,63] },
+  { id: "6-d",        type: 6, label: "D Standard (full-step down)",  midis: [38,43,48,53,57,62] },
+  { id: "6-dropc",    type: 6, label: "Drop C (C G C F A D)",    midis: [36,43,48,53,57,62] },
+  { id: "6-opend",    type: 6, label: "Open D (D A D F♯ A D)",   midis: [38,45,50,54,57,62] },
+  { id: "6-opene",    type: 6, label: "Open E (E B E G♯ B E)",   midis: [40,47,52,56,59,64] },
+  { id: "6-openg",    type: 6, label: "Open G (D G D G B D)",    midis: [38,43,50,55,59,62] },
+  { id: "6-opena",    type: 6, label: "Open A (E A E A C♯ E)",   midis: [40,45,52,57,61,64] },
+  { id: "6-dadgad",   type: 6, label: "DADGAD (D A D G A D)",    midis: [38,45,50,55,57,62] },
+  { id: "6-openc",    type: 6, label: "Open C (C G C G C E)",    midis: [36,43,50,55,60,64] },
+  // 7-string
+  { id: "7-standard", type: 7, label: "B Standard (B E A D G B E)", midis: [35,40,45,50,55,59,64] },
+  { id: "7-dropa",    type: 7, label: "Drop A (A E A D G B E)",     midis: [33,40,45,50,55,59,64] },
+  { id: "7-eb",       type: 7, label: "A♯ Standard (half-step down)", midis: [34,39,44,49,54,58,63] },
+  { id: "7-dropbb",   type: 7, label: "Drop A♯ (A♯ E A D G B E)",   midis: [34,40,45,50,55,59,64] },
+  // 12-string (courses listed low member first)
+  { id: "12-standard", type: 12, label: "12-string Standard",   midis: [40,52,45,57,50,62,55,67,59,59,64,64] },
+  { id: "12-dropd",    type: 12, label: "12-string Drop D",     midis: [38,50,45,57,50,62,55,67,59,59,64,64] },
+  { id: "12-eb",       type: 12, label: "12-string half-step down", midis: [39,51,44,56,49,61,54,66,58,58,63,63] },
+  { id: "12-dadgad",   type: 12, label: "12-string DADGAD",     midis: [38,50,45,57,50,62,55,67,57,69,62,62] },
+];
+const A4_VALUES = [432,433,434,435,436,437,438,439,440];
+
+/* ---------- tunables (overridable via config.json next to index.html) ---------- */
+const CFG = {
+  rms_gate: 0.0012,            // minimum signal level (RMS 0..1) for a frame to be analysed
+  median_frames: 3,            // consecutive detected frames before a reading is trusted
+  stable_ms: 350,              // how long a pitch must hold before auto-capture
+  stable_spread_cents: 10,     // max drift allowed during the hold
+  capture_window_cents: 60,    // capture only when within this of the target note
+  in_tune_tol_cents: 3,        // tuner: cents counted as "in tune"
+  tune_tol_cents: 4,           // wizard: open-string in-tune tolerance
+  harmonic_tol_cents: 8,       // wizard: harmonic acceptance vs octave target
+  pass_tol_cents: 3,           // wizard: fretted-vs-harmonic "done" tolerance
+  excellent_tol_cents: 1.5,    // wizard: bragging-rights tolerance
+  ghost_guard_ms: 1200,        // ring-out pause after harmonic capture
+  min_freq_hz: 50,             // pitch detection floor (50 = drop A 7-string)
+  max_freq_hz: 1600,           // pitch detection ceiling
+  yin_threshold: 0.13,         // YIN periodicity threshold (lower = more permissive)
+};
+
+/* ---------- state ---------- */
+const S = {
+  screen: "welcome",       // welcome | input | tuner | wizard | done
+  guitarType: 6,
+  tuningId: "6-standard",
+  a4: 440,
+  demo: false,
+  si: 0,                   // current string index
+  phase: "tune-open",
+  round: 1,
+  rounds: [],
+  results: {},
+  demoSeqIdx: 0,
+  // tuner
+  pin: -1,                 // -1 = auto
+  tuned: {},               // stringIdx -> true (session ✓ marks)
+};
+/* single-string demo narrative: +7.4 off -> overcorrect to -3.8 -> 1.2 -> refine 0.6
+   slight random jitter per run, but bands never overlap so the story stays consistent */
+function demoJitter() { return (Math.random() - 0.5) * 0.6; }
+const DEMO_PLAN = [
+  { phase: "tune-open",  cents: 0.4 },      // open string in tune (needle settles centre)
+  { phase: "harmonic",   cents: 0.4 },      // harmonic rings (ghost-guard sim)
+  { phase: "fretted",    cents: 7.8 },      // fretted reads +7.4 vs harmonic
+  { phase: "adjust",     cents: null },     // user turns screw (animation: needle swings)
+  { phase: "tune-open",  cents: 0.2 },      // retune
+  { phase: "harmonic",   cents: 0.2 },
+  { phase: "fretted",    cents: -3.4 },     // overcorrected -> -3.8
+  { phase: "adjust",     cents: null },
+  { phase: "tune-open",  cents: 0.3 },
+  { phase: "harmonic",   cents: 0.3 },
+  { phase: "fretted",    cents: 1.5 },      // 1.2¢ delta
+  { phase: "within",     cents: 1.5 },
+  { phase: "tune-open",  cents: 0.2 },      // refine pass
+  { phase: "harmonic",   cents: 0.2 },
+  { phase: "fretted",    cents: 0.9 },      // ~0.6¢
+  { phase: "within",     cents: 0.9 },
+];
+let demoStep = 0;
+
+/* ---------- helpers ---------- */
+function tuning() { return TUNINGS.find(t => t.id === S.tuningId) || TUNINGS[0]; }
+function midis() { return tuning().midis; }
+function nStrings() { return midis().length; }
+function midiToFreq(m) { return S.a4 * Math.pow(2, (m - 69) / 12); }
+function targetOpen() { return midiToFreq(midis()[S.si]); }
+function targetOct() { return midiToFreq(midis()[S.si] + 12); }
+function currentTarget() { return (S.phase === "tune-open") ? targetOpen() : targetOct(); }
+function centsBetween(f, ref) { return 1200 * Math.log2(f / ref); }
+function noteNameOf(f) { return midiName(Math.round(69 + 12 * Math.log2(f / S.a4))); }
+function strName(i) { return midiName(midis()[i]); }
+function fmtC(c) { const v = Math.abs(c) < 0.05 ? 0 : c; return (v > 0 ? "+" : "") + v.toFixed(1) + "¢"; }
+
+/* ---------- persistence (v2) ---------- */
+const LS_KEY = "intonate.v2";
+/* Config file: put config.json next to index.html to override any tunable.
+   Example: { "rms_gate": 0.0008, "stable_ms": 400 } — keys not present keep defaults. */
+const CONFIG_URL = "config.json";
+let configLoaded = null;
+let configFileValues = {};   // what config.json actually set (for preset switching)
+function loadConfig() {
+  if (configLoaded) return configLoaded;
+  configLoaded = fetch(CONFIG_URL, { cache: "no-store" })
+    .then(r => r.ok ? r.json() : {})
+    .then(over => {
+      configFileValues = {};
+      for (const k of Object.keys(over)) {
+        if (k in CFG) { CFG[k] = over[k]; configFileValues[k] = over[k]; }
+      }
+    })
+    .catch(() => {});   // no file or offline: defaults are fine
+  return configLoaded;
+}
+function saveState() {
+  try {
+    const persistable = !S.demo && !Object.values(S.results).some(r => r && r.demo);
+    if (!persistable) { clearState(); return; }
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      guitarType: S.guitarType, tuningId: S.tuningId, a4: S.a4,
+      si: S.si, phase: S.phase, round: S.round,
+      rounds: S.rounds, results: S.results, demo: false,
+      _hc: (S._hc !== undefined) ? S._hc : null,
+      _lastDelta: (S._lastDelta !== undefined) ? S._lastDelta : null,
+      _pendingDelta: (S._pendingDelta !== undefined) ? S._pendingDelta : null,
+    }));
+  } catch (e) {}
+}
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) { return null; }
+}
+function clearState() { try { localStorage.removeItem(LS_KEY); } catch (e) {} }
+
+/* ---------- DSP: YIN pitch detection ---------- */
+function yinDetect(buf, sr, minF, maxF, thresh) {
+  const N = buf.length, W = N >> 1;
+  const minTau = Math.max(1, Math.floor(sr / maxF));
+  const maxTau = Math.min(W - 2, Math.ceil(sr / minF));
+  if (maxTau <= minTau + 2) return null;
+  const d = new Float32Array(maxTau + 2);
+  const THRESH = (typeof thresh === "number") ? thresh : CFG.yin_threshold;
+  let cum = 0, below = false, tauEst = -1, cmndEst = 1;
+  for (let tau = 1; tau <= maxTau + 1; tau++) {
+    let sum = 0;
+    for (let j = 0; j < W; j++) {
+      const df = buf[j] - buf[j + tau];
+      sum += df * df;
+    }
+    d[tau] = sum;
+    cum += d[tau];
+    if (tau < minTau) continue;
+    const cmnd = cum > 0 ? (d[tau] * tau) / cum : 1;
+    if (!below) {
+      if (cmnd < THRESH) { below = true; tauEst = tau; cmndEst = cmnd; }
+    } else {
+      if (cmnd < cmndEst) { tauEst = tau; cmndEst = cmnd; }
+      else break;
+    }
+  }
+  if (tauEst < 0) return null;
+  const s0 = d[tauEst - 1], s1 = d[tauEst], s2 = d[tauEst + 1];
+  const denom = s0 - 2 * s1 + s2;
+  let betterTau = tauEst;
+  if (Math.abs(denom) > 1e-12) {
+    const off = (s0 - s2) / (2 * denom);
+    if (Math.abs(off) < 1) betterTau = tauEst + off;
+  }
+  return sr / betterTau;
+}
+
+/* ---------- audio engine ---------- */
+const A = {
+  ctx: null, stream: null, analyser: null, buf: null, sr: 44100,
+  running: false, raf: 0,
+  medians: [],
+  tStableSince: 0, tStableCents: [], tStableIdx: -1,
+  stableSince: 0, stableCents: [],
+};
+async function startAudio(deviceId) {
+  stopAudio();
+  const dev = deviceId ? { exact: deviceId } : undefined;
+  // Progressive fallback: some interfaces (e.g. Apogee Jam+ on Windows) throw
+  // NotReadableError when extra constraints ride along. Try full settings first
+  // (best pitch detection), then bare deviceId, then whatever the browser defaults to.
+  const attempts = [
+    { deviceId: dev, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    { deviceId: dev },
+    deviceId ? { deviceId: { ideal: deviceId } } : {},
+  ];
+  let stream = null, lastErr = null;
+  for (const audio of attempts) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: audio, video: false });
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (e && (e.name === "NotAllowedError" || e.name === "SecurityError")) throw e; // permission problem — retrying won't help
+    }
+  }
+  if (!stream) throw (lastErr || new Error("no stream"));
+  A.stream = stream;
+  A.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (A.ctx.state === "suspended") await A.ctx.resume();
+  A.sr = A.ctx.sampleRate;
+  const src = A.ctx.createMediaStreamSource(A.stream);
+  A.analyser = A.ctx.createAnalyser();
+  A.analyser.fftSize = (A.sr > 48000) ? 8192 : 4096;
+  A.analyser.smoothingTimeConstant = 0;
+  src.connect(A.analyser);
+  A.buf = new Float32Array(A.analyser.fftSize);
+  A.running = true;
+  requestAnimationFrame(audioLoop);
+}
+function stopAudio() {
+  A.running = false;
+  if (A.raf) cancelAnimationFrame(A.raf);
+  if (A.stream) { A.stream.getTracks().forEach(t => t.stop()); A.stream = null; }
+  if (A.ctx) { try { A.ctx.close(); } catch (e) {} A.ctx = null; }
+  A.stableSince = 0; A.stableCents = []; A.medians = [];
+  A.tStableSince = 0; A.tStableCents = []; A.tStableIdx = -1;
+}
+function rmsOf(buf) {
+  let s = 0;
+  for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return Math.sqrt(s / buf.length);
+}
+
+let frameNo = 0;
+function audioLoop() {
+  if (!A.running) return;
+  A.raf = requestAnimationFrame(audioLoop);
+  A.analyser.getFloatTimeDomainData(A.buf);
+  const rms = rmsOf(A.buf);
+  drawWave(A.buf);
+  updateLevel(rms);
+  frameNo++;
+  if (frameNo % 2 !== 0) return;
+
+  let f = null;
+  if (rms >= CFG.rms_gate) f = yinDetect(A.buf, A.sr, CFG.min_freq_hz, CFG.max_freq_hz);
+  if (f) {
+    A.medians.push(f);
+    if (A.medians.length > Math.max(2, CFG.median_frames + 4)) A.medians.shift();
+  } else {
+    A.medians.length = 0;
+  }
+  let med = null;
+  if (A.medians.length >= Math.max(2, CFG.median_frames)) {
+    const sorted = A.medians.slice().sort((a, b) => a - b);
+    med = sorted[sorted.length >> 1];
+  }
+  if (S.screen === "tuner") tunerTrack(med);
+  else if (S.screen === "wizard") trackStability(med);
+}
+
+/* ---------- wizard stability ---------- */
+function trackStability(med) {
+  const tgt = currentTarget();
+  const capturing = (S.phase === "tune-open" || S.phase === "harmonic" || S.phase === "fretted") && !S.demo;
+  if (!capturing || !med) {
+    A.stableSince = 0; A.stableCents = [];
+    updateReadout(med, tgt, 0);
+    return;
+  }
+  const c = centsBetween(med, tgt);
+  const now = performance.now();
+  if (Math.abs(c) <= CFG.capture_window_cents) {
+    if (A.stableSince) {
+      A.stableCents.push(c);
+      const cs = A.stableCents;
+      const mn = Math.min.apply(null, cs), mx = Math.max.apply(null, cs);
+      if (mx - mn > CFG.stable_spread_cents) { A.stableSince = now; A.stableCents = [c]; }
+      const held = now - A.stableSince;
+      updateReadout(med, tgt, Math.min(1, held / CFG.stable_ms));
+      if (held >= CFG.stable_ms) {
+        const cap = cs.slice().sort((a, b) => a - b);
+        const capMed = cap[cap.length >> 1];
+        A.stableSince = 0; A.stableCents = [];
+        onCapture(capMed);
+      }
+    } else {
+      A.stableSince = now; A.stableCents = [c];
+      updateReadout(med, tgt, 0.05);
+    }
+  } else {
+    A.stableSince = 0; A.stableCents = [];
+    updateReadout(med, tgt, 0);
+  }
+}
+
+/* ---------- tuner logic ---------- */
+function nearestString(f) {
+  let best = 0, bestC = Infinity;
+  const ms = midis();
+  for (let i = 0; i < ms.length; i++) {
+    const c = Math.abs(centsBetween(f, midiToFreq(ms[i])));
+    if (c < bestC) { bestC = c; best = i; }
+  }
+  return best;
+}
+function tunerTrack(med) {
+  const ms = midis();
+  let idx = S.pin;
+  if (idx < 0) { idx = med ? nearestString(med) : A.tStableIdx >= 0 ? A.tStableIdx : 0; }
+  const tgt = midiToFreq(ms[idx]);
+  updateReadoutT(med, tgt, idx, med ? (A.tStableSince ? Math.min(1, (performance.now() - A.tStableSince) / CFG.stable_ms) : 0) : 0);
+  if (!med) { A.tStableSince = 0; A.tStableCents = []; return; }
+  const c = centsBetween(med, tgt);
+  if (Math.abs(c) <= CFG.in_tune_tol_cents) {
+    const now = performance.now();
+    if (A.tStableIdx === idx && A.tStableSince) {
+      A.tStableCents.push(c);
+      if (now - A.tStableSince >= CFG.stable_ms) {
+        if (!S.tuned[idx]) {
+          S.tuned[idx] = true;
+          renderTunerChips();
+          const chip = document.querySelector('[data-tidx="' + idx + '"]');
+          if (chip) { chip.classList.add("flash"); setTimeout(() => chip.classList.remove("flash"), 650); }
+        }
+        A.tStableSince = 0; A.tStableCents = [];
+      }
+    } else {
+      A.tStableIdx = idx; A.tStableSince = now; A.tStableCents = [c];
+    }
+  } else {
+    A.tStableSince = 0; A.tStableCents = [];
+    if (A.tStableIdx !== idx) A.tStableIdx = idx;
+  }
+}
+
+/* ---------- wizard capture ---------- */
+// ghost guard: after harmonic capture, wait for the ring-out before accepting a fretted capture
+let ghostGuardUntil = 0;
+function armGhostGuard() { ghostGuardUntil = performance.now() + CFG.ghost_guard_ms; }
+function onCapture(centsVsTarget) {
+  if (S.screen !== "wizard") return;
+  if (S.phase === "tune-open") {
+    if (Math.abs(centsVsTarget) <= CFG.tune_tol_cents) setPhase("harmonic");
+    else showHint("warn", "The open string reads " + fmtC(centsVsTarget) + " (" + (centsVsTarget > 0 ? "sharp" : "flat") + "). Tune with the machine heads until the needle sits in the green zone, then let it ring for a moment.");
+  } else if (S.phase === "harmonic") {
+    if (Math.abs(centsVsTarget) <= CFG.harmonic_tol_cents) {
+      S._hc = centsVsTarget;
+      setPhase("fretted");
+      armGhostGuard();          // ignore the still-ringing harmonic until it dies
+    } else {
+      showHint("warn", "That harmonic reads " + fmtC(centsVsTarget) + " against where the string should be. Most often the open string slipped out of tune, or the harmonic was muted — touch the string directly over the fret wire, pick, and lift your finger immediately. Retune and try again.");
+    }
+  } else if (S.phase === "fretted") {
+    if (performance.now() < ghostGuardUntil) return;   // still ringing — ignore
+    const hc = (S._hc !== undefined) ? S._hc : 0;
+    const delta = centsVsTarget - hc;
+    S.rounds.push({ hc: hc, fc: centsVsTarget, delta: delta });
+    if (Math.abs(delta) <= CFG.pass_tol_cents) {
+      S._pendingDelta = delta;      // within tolerance — but the human decides
+      setPhase("within");
+    } else {
+      S._lastDelta = delta;
+      setPhase("adjust");
+    }
+    saveState();
+  }
+}
+
+function finishString(delta) {
+  const verdict = Math.abs(delta) <= CFG.excellent_tol_cents ? "excellent" : "good";
+  S.results[S.si] = { delta: delta, rounds: S.rounds.slice(), verdict: verdict };
+  setPhase("stringdone");
+  saveState();
+}
+
+function setPhase(phase) {
+  S.phase = phase;
+  renderWizard();
+  saveState();
+}
+
+function nextString() {
+  const n = nStrings();
+  // walk forward (wrapping) from the current string so Skip always advances
+  for (let k = 1; k <= n; k++) {
+    const i = (S.si + k) % n;
+    if (!S.results[i]) {
+      S.si = i; S.rounds = []; S.round = 1; S.demoSeqIdx = 0;
+      setPhase("tune-open");
+      return;
+    }
+  }
+  showDone();
+}
+
+/* ---------- UI: screens ---------- */
+function show(screen) {
+  S.screen = screen;
+  for (const id of ["welcome", "input", "tuner", "wizard", "done"]) {
+    const el = document.getElementById("screen-" + id);
+    if (el) el.classList.toggle("active", id === screen);
+  }
+  window.scrollTo(0, 0);
+}
+
+/* ---------- UI: input screen ---------- */
+function renderTuningOptions() {
+  const sel = document.getElementById("selTuning");
+  const cur = S.tuningId;
+  sel.innerHTML = "";
+  for (const t of TUNINGS) {
+    if (t.type !== S.guitarType) continue;
+    const o = document.createElement("option");
+    o.value = t.id;
+    o.textContent = t.label + "  —  " + t.midis.map(midiName).join(" ");
+    sel.appendChild(o);
+  }
+  // keep selection if valid for this guitar type, else first
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  else { sel.value = sel.options[0].value; S.tuningId = sel.value; }
+  const a4sel = document.getElementById("selA4");
+  a4sel.innerHTML = "";
+  for (const v of A4_VALUES) {
+    const o = document.createElement("option");
+    o.value = String(v);
+    o.textContent = v + " Hz";
+    a4sel.appendChild(o);
+  }
+  a4sel.value = String(S.a4);
+  updateA4Note();
+}
+function updateA4Note() {
+  const el = document.getElementById("a4note");
+  const e2 = midiToFreq(40).toFixed(2);
+  el.textContent = "Low E will target " + e2 + " Hz at this reference." + (S.a4 === 440 ? "" : " (440 Hz is the modern standard; 432 Hz is a popular alternative.)");
+}
+
+/* ---------- UI: tuner screen ---------- */
+function renderTunerChips() {
+  const box = document.getElementById("tunerChips");
+  box.innerHTML = "";
+  const auto = document.createElement("div");
+  auto.className = "chip auto" + (S.pin < 0 ? " active" : "");
+  auto.innerHTML = '<span class="nm">Auto</span><span class="st">detect</span>';
+  auto.addEventListener("click", () => { S.pin = -1; renderTunerChips(); });
+  box.appendChild(auto);
+  const ms = midis();
+  for (let i = 0; i < ms.length; i++) {
+    const chip = document.createElement("div");
+    chip.dataset.tidx = String(i);
+    chip.className = "chip" + (S.pin === i ? " pinned" : "") + (S.tuned[i] ? " done" : "");
+    chip.innerHTML = '<span class="nm">' + midiName(ms[i]) + '</span><span class="st">' + (S.tuned[i] ? "✓" : "—") + "</span>";
+    chip.addEventListener("click", () => { S.pin = (S.pin === i ? -1 : i); renderTunerChips(); });
+    box.appendChild(chip);
+  }
+  document.getElementById("tunerLabel").textContent = tuning().label + " · A4 = " + S.a4 + " Hz · " + S.guitarType + "-string";
+}
+
+/* ---------- UI: wizard rendering ---------- */
+function phaseStep() {
+  return { "tune-open": 1, "harmonic": 2, "fretted": 3, "adjust": 4, "within": 4, "stringdone": 4 }[S.phase] || 1;
+}
+function renderWizard() {
+  const chips = document.getElementById("chips");
+  chips.innerHTML = "";
+  const ms = midis();
+  for (let i = 0; i < ms.length; i++) {
+    const chip = document.createElement("div");
+    chip.className = "chip" + (i === S.si ? " active" : "") + (S.results[i] ? " done" : "");
+    let st = "pending";
+    if (S.results[i]) st = fmtC(S.results[i].delta);
+    else if (i === S.si) st = "in progress";
+    else if (i < S.si) st = "skipped";
+    chip.innerHTML = '<span class="nm">' + midiName(ms[i]) + '</span><span class="st">' + st + "</span>";
+    chips.appendChild(chip);
+  }
+
+  const sl = document.getElementById("stepLabel");
+  const nm = midiName(ms[S.si]);
+  if (S.phase === "stringdone") sl.textContent = "Round " + S.round + " · String complete";
+  else sl.textContent = "Round " + S.round + " · Step " + phaseStep() + " of 4 · " + nm + " string";
+
+  const instr = document.getElementById("instruction");
+  const sub = document.getElementById("instrSub");
+  const why = document.getElementById("whyText");
+  const whyMap = {
+    "tune-open": "Intonation adjustments move the saddle, which changes string tension and pitch — so every round has to start from a freshly tuned string. We tune to the open pitch now; after each saddle adjustment you'll retune and land back here.",
+    "harmonic": "The harmonic at the 12th fret divides the string exactly in half, so it always sounds at precisely double the open string's pitch — no matter where the saddle sits. That makes it the one trustworthy reference pitch on the guitar.",
+    "fretted": "If the 12th fret were exactly at the string's midpoint, the fretted note would match the harmonic perfectly. Any difference is the intonation error: it tells us which way and roughly how far to move the saddle.",
+    "adjust": "Sharp fretted notes mean the sounding length is a touch short for that string; lengthening the string flattens the fretted note back down. The reverse for flat. Tiny turns — the screw moves the saddle maybe a millimetre per quarter turn, and a few cents is a fraction of a millimetre.",
+    "stringdone": "Within ±3¢ the error is under the threshold anyone can reliably hear. Tighter is lovely but chasing hundredths of a cent on a mechanical bridge is a losing game.",
+  };
+  why.textContent = whyMap[S.phase] || "";
+  document.getElementById("whyBox").style.display = why.textContent ? "" : "none";
+
+  if (S.phase === "tune-open") {
+    instr.innerHTML = "Tune the <span class='strname'>open " + nm + "</span> string.";
+    sub.textContent = "Play the open string and let it ring. Watch the needle — adjust the machine heads until it sits in the green, then hold it steady a moment and we'll move on.";
+  } else if (S.phase === "harmonic") {
+    instr.innerHTML = "Play the <span class='strname'>" + nm + " 12th-fret harmonic</span>.";
+    sub.textContent = "Lightly touch the string directly over the 12th fret wire (not behind it), pick the string near the bridge, and lift your finger off the instant you pick. Let it ring.";
+  } else if (S.phase === "fretted") {
+    instr.innerHTML = "Now play the <span class='strname'>" + nm + " at the 12th fret, fretted</span>.";
+    sub.textContent = "Same pitch, pressed down normally. Fret with your usual pressure, as close to the fret as you can without being on top of it. Let it ring. (If you've only just played the harmonic, wait a beat for it to die away first.)";
+  } else if (S.phase === "adjust") {
+    const delta = S._lastDelta || 0;
+    const mag = Math.abs(delta);
+    let moveAdvice;
+    if (delta > 0) {
+      moveAdvice = "the fretted note read <strong style='color:var(--red)'>" + fmtC(delta) + " sharp</strong> of the harmonic. Make the string <strong style='color:var(--fg)'>LONGER</strong> — the saddle must move <strong style='color:var(--fg)'>away from the pickups, toward the tailpiece</strong>.";
+    } else {
+      moveAdvice = "the fretted note read <strong style='color:var(--red)'>" + fmtC(Math.abs(delta)) + " flat</strong> of the harmonic. Make the string <strong style='color:var(--fg)'>SHORTER</strong> — the saddle must move <strong style='color:var(--fg)'>toward the pickups, away from the tailpiece</strong>.";
+    }
+    instr.innerHTML = "Adjust the " + nm + " saddle.";
+    sub.innerHTML = "Round " + S.round + " measured: " + moveAdvice +
+      "<br><strong style='color:var(--fg)'>How to get there:</strong> on a tune-o-matic, the intonation screw sits behind/beside the saddle, running roughly <em>along the string</em> toward the tailpiece. Turning it <strong>clockwise (righty-tighty) generally pulls the saddle back toward the tailpiece = longer string = flatter fretted note</strong>; counter-clockwise pushes it toward the neck = shorter = sharper. <strong>Watch the saddle itself move, not the screw head</strong> — some bridges reverse the visual, and the proof is which way the saddle actually travels. Give it a small turn, watch the saddle shift, then retune and recheck." +
+      (S.rounds.length >= 2 ? "<br><strong style='color:var(--fg)'>Calibration from your own rounds:</strong> last round " + fmtC(S.rounds[S.rounds.length - 1].delta) + " → this round " + fmtC(delta) + ". Your last turn moved it " + fmtC(S.rounds[S.rounds.length - 1].delta - delta) + " — scale your next turn to the remaining " + fmtC(mag) + "." : "") +
+      " Then <strong style='color:var(--fg)'>re-tune the open string to pitch</strong> and come back to re-measure.";
+    if (mag > 10) {
+      sub.innerHTML += " <em>(" + mag.toFixed(0) + "¢ is a big gap for one adjustment — if it doesn't converge in a few rounds, check the action height and saddle seating on this string.)</em>";
+    }
+  } else if (S.phase === "within") {
+    const d = S._pendingDelta || 0;
+    const tol = CFG.pass_tol_cents;
+    instr.innerHTML = "<span class='strname'>" + nm + " is within tolerance.</span>";
+    sub.innerHTML = "This round measured <strong style='color:var(--green)'>" + fmtC(d) + "</strong> (target: within ±" + tol + "¢ of the harmonic). That's better than most guitars ever get — but if you want it tighter, take another pass: adjust the saddle a whisker (" + (d > 0 ? "lengthen very slightly" : "shorten very slightly") + "), retune, and re-measure. Or accept it and move on — the choice is yours." +
+      "<br><span style='color:var(--fg-faint)'>Reminder: sharp fretted → lengthen (saddle toward tailpiece); flat → shorten (saddle toward pickups).</span>";
+  } else if (S.phase === "stringdone") {
+    const r = S.results[S.si];
+    if (!r) { setPhase("tune-open"); return; }   // defensive: result missing (corrupt state) -> restart this string
+    instr.innerHTML = "<span class='strname'>" + nm + " is dialled in.</span>";
+    sub.textContent = "Final fretted-vs-harmonic error: " + fmtC(r.delta) + " after " + S.rounds.length + " round" + (S.rounds.length === 1 ? "" : "s") + ". " + (r.verdict === "excellent" ? "Excellent — studio-grade." : "Good — well inside the audible threshold.");
+  }
+
+  const rb = document.getElementById("roundsBox");
+  const rl = document.getElementById("roundsList");
+  rl.innerHTML = "";
+  if (S.rounds.length) {
+    rb.style.display = "";
+    const maxAbs = Math.max.apply(null, S.rounds.map(r => Math.abs(r.delta)).concat([5]));
+    S.rounds.forEach((r, i) => {
+      const row = document.createElement("div");
+      row.className = "roundrow";
+      const w = Math.max(4, Math.round(Math.abs(r.delta) / maxAbs * 60));
+      row.innerHTML = '<span class="who">Round ' + (i + 1) + "</span>" +
+        '<span class="rb' + (Math.abs(r.delta) <= CFG.pass_tol_cents ? " ok" : "") + '" style="width:' + w + 'px"></span>' +
+        "<span>fretted " + fmtC(r.fc) + " vs harmonic " + fmtC(r.hc) + " → <strong>" + fmtC(r.delta) + "</strong></span>";
+      rl.appendChild(row);
+    });
+  } else rb.style.display = "none";
+
+  const wb = document.getElementById("wizardBtns");
+  wb.innerHTML = "";
+  const mkBtn = (label, cls, fn) => {
+    const b = document.createElement("button");
+    b.className = "btn " + cls; b.textContent = label;
+    b.addEventListener("click", fn);
+    wb.appendChild(b);
+    return b;
+  };
+  if (S.phase === "adjust") {
+    mkBtn("Adjusted & retuned — recheck →", "", () => {
+      S.round++;
+      S.demoSeqIdx = Math.min(S.demoSeqIdx + 1, DEMO_SEQ.length - 1);
+      setPhase("tune-open");
+    });
+  }
+  if (S.phase === "within") {
+    mkBtn("Accept — next step →", "", () => { finishString(S._pendingDelta || 0); });
+    mkBtn("Refine — take another pass", "ghost", () => {
+      S._lastDelta = S._pendingDelta || 0;
+      S.round++;
+      setPhase("tune-open");
+    });
+  }
+  if (S.phase === "stringdone") {
+    const anyLeft = Array.from({length: nStrings()}, (_, i) => i).some(i => !S.results[i]);
+    if (anyLeft) mkBtn("Next string →", "", nextString);
+    else mkBtn("See report →", "", showDone);
+  }
+  hideHint();
+  if (S.demo && !demoRunning) runDemoStep();
+}
+let demoRunning = false;
+
+/* ---- single-string demo: auto-plays with animated needle + narration ---- */
+let demoTimer = 0;
+function demoAnimTo(cents, tol, ms) {
+  // animate needle from current visual cents to target over ms with slight overshoot
+  if (!document.getElementById("needleGrp")) return;
+  const startC = demoCurrentCents;
+  const t0 = performance.now();
+  const jitter = demoJitter();
+  cancelAnimationFrame(demoTimer);
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / ms);
+    const ease = p < 0.85 ? (p / 0.85) * 1.12 : 1.12 - 0.12 * ((p - 0.85) / 0.15);  // overshoot & settle
+    const val = startC + (cents + jitter * (1 - p)) * ease - (cents + jitter) * 0;   // hmm simpler below
+    const cur = startC + (cents - startC) * ease;
+    demoCurrentCents = cur;
+    const fakeFreq = targetOpen() * Math.pow(2, (S.phase === "tune-open" ? cur : cur) / 1200);
+    setNeedle(needle, cur, tol);
+    ledSet(document.getElementById("led7"), noteToLed(targetOpen() * Math.pow(2, cur / 1200)));
+    const big = document.getElementById("centsBig");
+    big.innerHTML = (cur >= 0 ? "+" : "") + cur.toFixed(1) + "<small>¢</small>";
+    big.style.color = Math.abs(cur) <= tol ? "var(--green)" : (Math.abs(cur) > 15 ? "var(--red)" : "var(--fg)");
+    if (p < 1) demoTimer = requestAnimationFrame(step);
+  };
+  demoTimer = requestAnimationFrame(step);
+}
+let demoCurrentCents = 0;
+function demoNarrate(text, kind) {
+  S._demoNarr = '<em class="demo-narr">' + text + "</em>";
+  document.getElementById("instrSub").innerHTML = S._demoNarr;
+  const hint = document.getElementById("hint");
+  if (kind) { hint.className = "hint show " + kind; hint.textContent = ""; }
+}
+/* ---- single-string tutorial: ONE action at a time, prev/next/close navigation ---- */
+function demoApply(step) {
+  // paint the state for this step without any timers
+  const goto = (ph) => { S.phase = ph; };
+  switch (step.phase) {
+    case "tune-open":
+      goto("tune-open");
+      S._hc = undefined;
+      renderWizardStatic();
+      demoNarrate("Play the open string — it rings, the needle settles near centre. In tune.", "");
+      demoAnimTo(step.cents, CFG.tune_tol_cents, 900);
+      break;
+    case "harmonic":
+      goto("harmonic");
+      renderWizardStatic();
+      demoNarrate("Now the 12th-fret harmonic — always exactly double the open pitch, our trustworthy reference.", "");
+      demoAnimTo(step.cents, CFG.harmonic_tol_cents, 900);
+      S._hc = step.cents;
+      break;
+    case "fretted":
+      goto("fretted");
+      renderWizardStatic();
+      demoNarrate("Same note, fretted normally. The needle swings out — this is the intonation error showing itself.", "");
+      demoAnimTo(step.cents, CFG.harmonic_tol_cents, 1100);
+      break;
+    case "adjust": {
+      const delta = S._lastDelta;
+      goto("adjust");
+      renderWizardStatic();
+      const dir = delta > 0 ? "sharp → lengthen the string: saddle toward the tailpiece" : "flat → shorten: saddle toward the pickups";
+      demoNarrate("Round reads <strong>" + fmtC(delta) + "</strong> " + dir + ". The needle shows where the saddle needs to go.", "warn");
+      demoAnimTo(delta, CFG.harmonic_tol_cents, 900);
+      break;
+    }
+    case "within":
+      goto("within");
+      renderWizardStatic();
+      demoNarrate("Within tolerance at <strong>" + fmtC(S._pendingDelta) + "</strong> — accept and move on, or refine.", "ok");
+      demoAnimTo(S._pendingDelta, CFG.harmonic_tol_cents, 900);
+      break;
+  }
+}
+function demoBookkeep(step) {
+  // state side-effects once per step, applied when NEXT is used (so prev/next is consistent)
+  if (step.phase === "fretted") {
+    const delta = step.cents - S._hc;
+    if (!S.rounds.length || S.rounds[S.rounds.length - 1].fc !== step.cents) {
+      S.rounds.push({ hc: S._hc, fc: step.cents, delta: delta });
+    }
+    if (Math.abs(delta) <= CFG.pass_tol_cents) { S._pendingDelta = delta; S.phase = "within"; }
+    else { S._lastDelta = delta; S.phase = "adjust"; }
+  }
+}
+function renderDemoNav() {
+  const wb = document.getElementById("wizardBtns");
+  wb.innerHTML = "";
+  const mk = (label, dis, fn, cls) => {
+    const b = document.createElement("button");
+    b.className = "btn " + (cls || "");
+    b.textContent = label;
+    b.disabled = !!dis;
+    if (fn) b.addEventListener("click", fn);
+    wb.appendChild(b);
+  };
+  mk("\u2190 Back", demoStep === 0, () => { demoStep--; demoGo(false); });
+  if (demoStep >= DEMO_PLAN.length - 1) {
+    mk("Finish \u2192", false, () => {
+      demoNarrate("That's the whole dance: tune → measure → adjust → retune → repeat. Now do it for real — the meter will listen to your actual guitar.", "ok");
+      S.demo = false; demoStep = 0; beginWizard(false); // restart as real wizard prompt
+      show("input");                                    // send them to the input chooser
+    }, "");
+  } else {
+    mk("Next \u2192", false, () => { demoGo(true); });
+  }
+  mk("Close", false, () => { S.demo = false; demoStep = 0; cancelAnimationFrame(demoTimer); show("welcome"); }, "ghost");
+}
+function demoGo(forward) {
+  if (forward) {
+    const step = DEMO_PLAN[demoStep];
+    demoBookkeep(step);           // commit this step's side-effects before moving on
+    demoStep = Math.min(demoStep + 1, DEMO_PLAN.length - 1);
+  } else {
+    demoStep = Math.max(demoStep - 1, 0);
+  }
+  demoApply(DEMO_PLAN[demoStep]);
+  renderDemoNav();
+}
+/* step-0 bootstrap: called from renderWizard's demo hook */
+function runDemoStep() {
+  demoApply(DEMO_PLAN[demoStep]);
+  renderDemoNav();
+}
+function renderWizardStatic() {
+  const save = S.demo;
+  S.demo = false;
+  renderWizard();
+  S.demo = save;
+  // restore narration over the default sub text
+  if (S._demoNarr) { document.getElementById("instrSub").innerHTML = S._demoNarr; }
+}
+
+/* ---------- UI: gauges (aligned to raster meter art, viewBox 605x600) ---------- */
+/* ---------- UI: gauges (aligned to raster meter art, viewBox 605x600) ---------- */
+const MX = 302, MY = 404;          // needle pivot in artwork px (artwork's movement)
+const WX = 300, WY = 302;          // window/bezel circle centre (measured from the art)
+const MARK_R = 152;                // marking-line radius from W — constant gap below the gloss
+const LED_R = 256;                 // LED ring: concentric with window, clear of holes (r≈254) and edge (r≈203)
+const SWEEP = 32;                  // degrees each side of vertical
+/* point on a marking circle (centred on the WINDOW) along the needle's ray from the pivot —
+   keeps ticks aligned with the needle AND the whole scale equidistant from the window edge */
+function rayHit(frac, rFromW) {
+  const th = fracToAngle(frac) * Math.PI / 180;
+  const dx = Math.sin(th), dy = -Math.cos(th);
+  const px = MX - WX, py = MY - WY;
+  const b = px * dx + py * dy;
+  const c = px * px + py * py - rFromW * rFromW;
+  const t = -b + Math.sqrt(b * b - c);
+  return [MX + t * dx, MY + t * dy];
+}
+function markPath(rFromW, f1, f2, steps) {
+  const n = steps || 28;
+  let d = "";
+  for (let i = 0; i <= n; i++) {
+    const [x, y] = rayHit(f1 + (f2 - f1) * i / n, rFromW);
+    d += (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+  }
+  return d;
+}                 // LED ring centerline radius (inside bezel edge ~287)
+function fracToAngle(frac) { return frac * SWEEP; }   // deg, -50..+50
+function polarArt(r, frac) {
+  const th = (-90 + fracToAngle(frac)) * Math.PI / 180;
+  return [MX + r * Math.cos(th), MY + r * Math.sin(th)];
+}
+function arcArt(r, f1, f2, steps) {
+  const n = steps || 24;
+  let d = "";
+  for (let i = 0; i <= n; i++) {
+    const f = f1 + (f2 - f1) * i / n;
+    const [x, y] = polarArt(r, f);
+    d += (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+  }
+  return d;
+}
+/* nonlinear cents -> frac: ±tol spans inner 22% of the sweep, log outward to ±200¢ */
+function centsToNeedle(c, tol) {
+  const t = (typeof tol === "number" && tol > 0) ? tol : CFG.in_tune_tol_cents;
+  const cl = Math.max(-200, Math.min(200, c));
+  const a = Math.abs(cl);
+  const inner = 0.22;
+  let frac;
+  if (a <= t) frac = (a / t) * inner;
+  else frac = inner + (1 - inner) * Math.log(1 + (a - t) / t) / Math.log(1 + (200 - t) / t);
+  return (cl < 0 ? -1 : 1) * frac;
+}
+let ledAngle = 0;   // persistent strobe phase
+function buildGaugeInto(svgEl, needleId) {
+  const cx = MX, cy = MY;
+  const tol = CFG.in_tune_tol_cents;
+  const tolF = centsToNeedle(tol, tol);
+  const warmF = tolF * 0.4;
+  const themeAttr = 'data-theme';
+  const col = (name) => `var(--${name})`;
+  let svg = "";
+  // LED strobe ring (outside window, inside bezel) — 36 LEDs
+  svg += '<g id="' + needleId + 'Ring">';
+  const N = 36;
+  for (let i = 0; i < N; i++) {
+    const th = (i / N) * 2 * Math.PI;
+    // LED ring ON the rivet circle (r=256, centred on the window), skipping the 3 rivet positions
+    const lx = WX + 256 * Math.cos(th), ly = WY + 256 * Math.sin(th);
+    svg += `<circle class="strobedot" id="${needleId}Led${i}" cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="6" fill="rgba(120,60,20,0.18)"/>`;
+  }
+  svg += '</g>';
+  // marking line: follows the window's curvature exactly (constant gap from the edge)
+  svg += `<path id="${needleId}Arc" d="${markPath(MARK_R, -1, 1)}" fill="none" stroke="rgba(60,30,10,0.55)" stroke-width="3" class="gaugearc"/>`;
+  // ticks: major every 25¢ up to 200 (nonlinear positions), minor between
+  const ticks = [];
+  for (let c = -200; c <= 200; c += 25) ticks.push(c);
+  for (const c of ticks) {
+    const f = centsToNeedle(c, tol);
+    const major = (c % 100 === 0) && Math.abs(c) !== 200;
+    const [x1, y1] = rayHit(f, 144);
+    const [x2, y2] = rayHit(f, 164);
+    const colr = Math.abs(c) <= tol ? '#1e6b3a' : (Math.abs(c) <= 25 ? '#8a5a10' : 'rgba(70,35,12,0.8)');
+    svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${colr}" stroke-width="${major ? 3 : 1.5}"/>`;
+    if (major) {
+      const [tx, ty] = rayHit(f, 126);
+      svg += `<text x="${tx.toFixed(1)}" y="${(ty + 5).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="600" class="gtick">${c > 0 ? '+' + c : (c < 0 ? '\u2212' + Math.abs(c) : c)}</text>`;
+    }
+  }
+  // tolerance band wedge on the arc
+  svg += `<path d="${markPath(MARK_R, -tolF, tolF)}" fill="none" stroke="rgba(30,140,70,0.8)" stroke-width="6" stroke-linecap="round"/>`;
+  // needle: tapered blade w/ lengthwise gradient + cast shadow (ref1 technique)
+  svg += `<defs>
+    <linearGradient id="${needleId}Blade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4a1f14"/>
+      <stop offset=".3" stop-color="#8a4530"/>
+      <stop offset=".5" stop-color="#612B26"/>
+      <stop offset=".75" stop-color="#a05a40"/>
+      <stop offset="1" stop-color="#3d1a10"/>
+    </linearGradient>
+    <filter id="${needleId}Blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.4"/></filter>
+  </defs>`;
+  // needle assembly: ONE group rotates together (shadow + blade + highlight + bevel)
+  svg += `<g id="${needleId}Grp">`;
+  // shadow (slightly offset toward lower-right, light comes upper-left)
+  svg += `<path id="${needleId}Shadow" d="M ${cx - 6} ${cy + 3} L ${cx - 2} ${cy - 248} L ${cx + 2} ${cy - 248} L ${cx + 6} ${cy + 3} Z" fill="rgba(25,8,4,0.6)" filter="url(#${needleId}Blur)" transform="translate(7,6)" opacity="0.9"/>`;
+  // blade
+  svg += `<path id="${needleId}" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 248} L ${cx} ${cy - 254} L ${cx + 2.4} ${cy - 248} L ${cx + 8} ${cy + 4} Z" fill="url(#${needleId}Blade)" stroke="rgba(40,15,8,0.6)" stroke-width="1"/>`;
+  // lengthwise specular highlight (ref1: light catches mid-blade) — strong, visible at small sizes
+  svg += `<path id="${needleId}Hi" d="M ${cx + 0.6} ${cy + 2} L ${cx + 1.6} ${cy - 244} L ${cx + 3.4} ${cy - 246} L ${cx + 5.2} ${cy + 2} Z" fill="rgba(255,200,135,0.95)"/>`;
+  // dark left edge (bevel shadow side)
+  svg += `<path id="${needleId}Lo" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 248} L ${cx - 1.4} ${cy - 248} L ${cx - 4.6} ${cy + 4} Z" fill="rgba(28,9,5,0.95)"/>`;
+  svg += `</g>`;
+  // red pivot hub drawn on top (hides blade base, per ref1) — outside the rotating group
+  svg += `<circle cx="${cx}" cy="${cy}" r="16" fill="#6b1f1a"/><circle cx="${cx}" cy="${cy}" r="10" fill="#8d2c22"/><circle cx="${cx}" cy="${cy}" r="3.5" fill="#43100c"/>`;
+  svgEl.innerHTML = svg;
+}
+let lastCents = 0;
+function setNeedle(svgNeedle, c, tol) {
+  const frac = centsToNeedle(c, tol);
+  const ang = fracToAngle(frac);
+  const id = svgNeedle.id;
+  // one group holds shadow+blade+highlight+bevel: a single attribute write per frame,
+  // so the needle can never paint as two pieces mid-rotation
+  const grp = document.getElementById(id + "Grp");
+  if (grp) grp.setAttribute("transform", `rotate(${ang.toFixed(2)} ${MX} ${MY})`);
+  else {  // fallback (shouldn't happen): move the parts together
+    const rot = `rotate(${ang.toFixed(2)} ${MX} ${MY})`;
+    for (const part of ["", "Shadow", "Hi", "Lo"]) {
+      const el = document.getElementById(id + part);
+      if (el) el.setAttribute("transform", part === "Shadow" ? `translate(3,2) ${rot}` : rot);
+    }
+  }
+  lastCents = c;
+  // strobe ring: speed ∝ |cents|, direction = sign; in-tune => slow shimmer only
+  updateStrobeRing(id, c);
+}
+function updateStrobeRing(needleId, c) {
+  const ring = document.getElementById(needleId + "Ring");
+  if (!ring) return;
+  const N = 36;
+  const mag = Math.min(200, Math.abs(c));
+  const inTune = mag <= CFG.in_tune_tol_cents;
+  // drift phase: faster the further out; direction by sign
+  ledAngle += (inTune ? 2 : (4 + mag * 0.8)) * (c >= 0 ? 1 : -1);
+  const activeCount = inTune ? 2 : (mag > 100 ? 8 : (mag > 30 ? 5 : 3));
+  const base = inTune ? '#1e8c46' : (mag > 100 ? '#c22a1c' : '#c2701e');
+  for (let i = 0; i < N; i++) {
+    const dot = document.getElementById(needleId + "Led" + i);
+    if (!dot) continue;
+    // trailing comet: brightest at active head, dim tail behind (direction-aware)
+    let d = (i - Math.round((ledAngle / 10) % N)) % N;
+    if (d < 0) d += N;
+    let cls = "strobedot";
+    let fill = "rgba(120,60,20,0.15)", glow = 0;
+    if (d < activeCount) {
+      const t = 1 - d / activeCount;
+      fill = base; glow = t;
+    }
+    dot.setAttribute("fill", fill);
+    dot.setAttribute("opacity", d < activeCount ? (0.25 + 0.75 * glow).toFixed(2) : "0.16");
+    dot.setAttribute("r", d < activeCount ? (5 + 2.5 * glow).toFixed(1) : "4.5");
+    dot.classList = cls;
+  }
+}
+/* ---------- 7-segment LED display ---------- */
+/* order: [a,b,c,d,e,f,g1,g2,i,k,h,j,l,m] */
+const SEG_MAP = {
+  "A": [1,1,1,0,1,1,1,1,0,0,0,0,0,0],
+  "B": [1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+  "C": [1,0,0,1,1,1,0,0,0,0,0,0,0,0],
+  "D": [0,1,1,1,1,0,1,1,1,1,0,0,0,0],
+  "E": [1,0,0,1,1,1,1,0,0,0,0,0,0,0],
+  "F": [1,0,0,0,1,1,1,0,0,0,0,0,0,0],
+  "G": [1,0,1,1,1,1,0,1,0,0,0,0,0,0],
+};
+/* 14-segment geometry: a-f hex bars + g1/g2 middle halves + i/k centre verticals + 4 diagonals */
+const SEG_PATHS = [
+  "M14 6 L18 2 L40 2 L44 6 L40 10 L18 10 Z",           // a (top)
+  "M46 4 L50 8 L50 22 L46 26 L42 22 L42 8 Z",           // b (top-right)
+  "M46 28 L50 32 L50 46 L46 50 L42 46 L42 32 Z",        // c (bottom-right)
+  "M14 54 L18 50 L40 50 L44 54 L40 58 L18 58 Z",        // d (bottom)
+  "M10 28 L14 32 L14 46 L10 50 L6 46 L6 32 Z",          // e (bottom-left)
+  "M10 4 L14 8 L14 22 L10 26 L6 22 L6 8 Z",             // f (top-left)
+];
+const SEG_G1 = "M12 27 L16 23 L26 23 L30 27 L26 31 L16 31 Z";   // middle-left
+const SEG_G2 = "M30 27 L34 23 L44 23 L48 27 L44 31 L34 31 Z";   // middle-right
+const SEG_I  = "M28 11 L32 15 L32 22 L28 26 L24 22 L24 15 Z";   // centre vertical, upper
+const SEG_K  = "M28 28 L32 32 L32 46 L28 50 L24 46 L24 32 Z";   // centre vertical, lower
+const SEG_H  = "M11 11 L24 24 L21 27 L8 14 Z";                  // diagonal upper-left
+const SEG_J  = "M8 48 L22 34 L25 37 L11 51 Z";                  // diagonal lower-left
+const SEG_L  = "M46 50 L32 36 L29 39 L43 53 Z";              // diagonal lower-right
+const SEG_M  = "M46 12 L33 25 L30 22 L43 9 Z";                  // diagonal upper-right
+const SEG_ORDER = ["a","b","c","d","e","f","g1","g2","i","k","h","j","l","m"];
+function buildLedInto(svgEl) {
+  const slotX = [1, 47, 93, 139];
+  for (let s = 0; s < 4; s++) {
+    let g = `<g transform="translate(${slotX[s]},2)">`;
+    const paths = { a: SEG_PATHS[0], b: SEG_PATHS[1], c: SEG_PATHS[2], d: SEG_PATHS[3], e: SEG_PATHS[4], f: SEG_PATHS[5],
+                    g1: SEG_G1, g2: SEG_G2, i: SEG_I, k: SEG_K, h: SEG_H, j: SEG_J, l: SEG_L, m: SEG_M };
+    for (const nm of SEG_ORDER) g += `<path class="ledseg off" id="${svgEl.id}G${s}S${nm}" d="${paths[nm]}"/>`;
+    if (s === 0) g += `<path class="ledseg off" id="${svgEl.id}G${s}S7" d="M12 30 L36 30 L40 34 L36 38 L12 38 L8 34 Z"/>`;
+    g += `</g>`;
+    svgEl.innerHTML += g;
+  }
+  // accidental glyphs (slot 2) + idle dash (slot 3) — real symbols, not seg hacks
+  svgEl.innerHTML += `<g transform="translate(93,2)">
+    <path class="ledseg off" id="${svgEl.id}G2SHARP" d="M16 6 L22 6 L18 50 L12 50 Z M30 6 L36 6 L32 50 L26 50 Z M6 19 L40 14 L42 21 L8 26 Z M4 33 L38 28 L40 35 L6 40 Z"/>
+    <path class="ledseg off" id="${svgEl.id}G2FLAT" d="M12 4 L19 4 L16 48 L9 48 Z M15 28 C28 24 38 31 36 41 C34 50 22 52 14 45 Z"/>
+  </g><g transform="translate(139,2)">
+    <path class="ledseg off" id="${svgEl.id}G3DASH" d="M10 28 L38 28 L42 32 L38 36 L10 36 L6 32 Z"/>
+  </g>`;
+}
+function noteToLed(freq) {
+  const m = Math.round(69 + 12 * Math.log2(freq / S.a4));
+  const name = midiName(m);
+  const letter = name[0];
+  const acc = name.includes("\u266f") ? "#" : (name.includes("\u266d") ? "b" : "");
+  return { letter, acc };
+}
+function ledSet(svgEl, str) {
+  // str: {letter:"A", acc:""|"#"|"b"} | "-" (idle dash) | "" (blank)
+  const id = svgEl.id;
+  const set = (sid, on) => {
+    const el = document.getElementById(id + sid);
+    if (el) el.classList.toggle("off", !on);
+  };
+  for (let sI = 0; sI < 4; sI++) for (const nm of SEG_ORDER) set(`G${sI}S${nm}`, false);
+  set("G2SHARP", false); set("G2FLAT", false); set("G3DASH", false);
+  if (str === "-") { set("G3DASH", true); return; }
+  if (!str) return;
+  const letter = (str.letter || "").toUpperCase();
+  const pat = SEG_MAP[letter];
+  if (pat) SEG_ORDER.forEach((nm, idx) => set(`G3S${nm}`, !!pat[idx]));
+  if (str.acc === "#") set("G2SHARP", true);
+  else if (str.acc === "b") set("G2FLAT", true);
+}
+function noteToLed(freq) {
+  const m = Math.round(69 + 12 * Math.log2(freq / S.a4));
+  const name = midiName(m);
+  const letter = name[0];
+  const acc = name.includes("\u266f") ? "#" : (name.includes("\u266d") ? "b" : "");
+  return { letter, acc };
+}
+
+function updateReadout(med, tgt, lock) {
+  const needle = document.getElementById("needle");
+  const big = document.getElementById("centsBig");
+  const word = document.getElementById("centsWord");
+  const det = document.getElementById("detNote");
+  const lockbar = document.getElementById("lockbar");
+  lockbar.style.width = (lock * 100) + "%";
+  if (med) {
+    const c = centsBetween(med, tgt);
+    setNeedle(needle, c, CFG.tune_tol_cents);
+    const ac = Math.abs(c);
+    let w;
+    if (ac <= CFG.tune_tol_cents) w = "in tune";
+    else w = c > 0 ? "sharp" : "flat";
+    big.innerHTML = (c >= 0 ? "+" : "") + c.toFixed(1) + "<small>¢</small>";
+    big.style.color = ac <= CFG.tune_tol_cents ? "var(--green)" : (ac > 15 ? "var(--red)" : "var(--fg)");
+    word.textContent = w + (lock > 0 && lock < 1 ? " · holding…" : "");
+    det.textContent = noteNameOf(med) + " · " + med.toFixed(1) + " Hz";
+    ledSet(document.getElementById("led7"), noteToLed(med));
+  } else {
+    const nd = document.getElementById("needleGrp");
+    if (nd) nd.setAttribute("transform", `rotate(0 ${MX} ${MY})`);
+    updateStrobeRing("needle", 0);
+    big.textContent = "–";
+    big.style.color = "var(--fg-dim)";
+    word.textContent = "listening…";
+    det.textContent = "";
+    ledSet(document.getElementById("led7"), "-");
+  }
+}
+function updateReadoutT(med, tgt, idx, lock) {
+  const needle = document.getElementById("needleT");
+  const big = document.getElementById("centsBigT");
+  const word = document.getElementById("centsWordT");
+  const det = document.getElementById("detNoteT");
+  const lockbar = document.getElementById("lockbarT");
+  lockbar.style.width = (lock * 100) + "%";
+  // highlight active chip
+  document.querySelectorAll("#tunerChips .chip").forEach(ch => {
+    const ti = ch.dataset.tidx;
+    ch.classList.toggle("active", S.pin < 0 && med && ti === String(idx));
+  });
+  if (med) {
+    const c = centsBetween(med, tgt);
+    setNeedle(needle, c, CFG.in_tune_tol_cents);
+    const ac = Math.abs(c);
+    let w;
+    if (ac <= CFG.in_tune_tol_cents) w = "in tune";
+    else w = c > 0 ? "sharp" : "flat";
+    big.innerHTML = (c >= 0 ? "+" : "") + c.toFixed(1) + "<small>¢</small>";
+    big.style.color = ac <= CFG.in_tune_tol_cents ? "var(--green)" : (ac > 15 ? "var(--red)" : "var(--fg)");
+    word.textContent = w + (lock > 0 && lock < 1 ? " · holding…" : "") + (S.pin >= 0 ? " · pinned to " + midiName(midis()[S.pin]) : "");
+    det.textContent = noteNameOf(med) + " · " + med.toFixed(1) + " Hz · nearest: " + midiName(midis()[idx]);
+    ledSet(document.getElementById("led7T"), noteToLed(med));
+  } else {
+    const nd = document.getElementById("needleTGrp");
+    if (nd) nd.setAttribute("transform", `rotate(0 ${MX} ${MY})`);
+    updateStrobeRing("needleT", 0);
+    big.textContent = "–";
+    big.style.color = "var(--fg-dim)";
+    word.textContent = "listening…";
+    det.textContent = "";
+    ledSet(document.getElementById("led7T"), "-");
+  }
+}
+
+/* ---------- hints / waveform / level ---------- */
+function showHint(kind, text) {
+  const h = document.getElementById("hint");
+  h.className = "hint show " + kind;
+  h.textContent = text;
+}
+function hideHint() {
+  const h = document.getElementById("hint");
+  h.className = "hint"; h.textContent = "";
+}
+const waveCv = document.getElementById("wave");
+const wave2Cv = document.getElementById("wave2");
+const waveTCv = document.getElementById("waveT");
+function drawWave(buf) {
+  for (const cv of [waveCv, wave2Cv, waveTCv]) {
+    if (!cv || !cv.width) continue;
+    const ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = "#8a6a33";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const step = Math.max(1, Math.floor(buf.length / W));
+    let x = 0;
+    for (let i = 0; i < buf.length; i += step) {
+      let mn = 1, mx = -1;
+      for (let j = i; j < i + step && j < buf.length; j++) { const v = buf[j]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      const y1 = H / 2 - mx * (H / 2 - 2), y2 = H / 2 - mn * (H / 2 - 2);
+      ctx.moveTo(x + 0.5, y1); ctx.lineTo(x + 0.5, y2);
+      x++;
+      if (x > W) break;
+    }
+    ctx.stroke();
+  }
+}
+function sizeCanvases() {
+  for (const cv of [waveCv, wave2Cv, waveTCv]) {
+    if (!cv) continue;
+    const r = cv.getBoundingClientRect();
+    cv.width = Math.max(100, Math.floor(r.width));
+    cv.height = 46;
+  }
+}
+window.addEventListener("resize", sizeCanvases);
+function updateLevel(rms) {
+  const bar = document.getElementById("levelbar");
+  const lbl = document.getElementById("levellbl");
+  if (!bar) return;
+  const db = 20 * Math.log10(Math.max(rms, 1e-6));
+  bar.style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + "%";
+  if (rms < 0.0008) lbl.textContent = "Waiting for audio…";
+  else if (rms < CFG.rms_gate) lbl.textContent = "Signal detected but quiet — play louder, move the mic closer, or lower Sensitivity → Gate (settings).";
+  else if (rms > 0.9) lbl.textContent = "Very hot signal — if notes glitch, turn down the input gain.";
+  else lbl.textContent = "Good signal level.";
+}
+
+/* ---------- done screen ---------- */
+function showDone() {
+  show("done");
+  stopAudio();
+  const ms = midis();
+  let worst = 0, worstI = -1, count = 0;
+  let rows = "<tr><th>String</th><th>Final error</th><th>Rounds</th><th>Verdict</th></tr>";
+  for (let i = 0; i < ms.length; i++) {
+    const r = S.results[i];
+    if (!r) { rows += "<tr><td>" + midiName(ms[i]) + "</td><td colspan='3' style='color:var(--fg-faint)'>skipped</td></tr>"; continue; }
+    count++;
+    if (Math.abs(r.delta) > Math.abs(worst)) { worst = r.delta; worstI = i; }
+    rows += "<tr><td>" + midiName(ms[i]) + '</td><td class="num"><span class="' + (Math.abs(r.delta) <= CFG.pass_tol_cents ? "ok" : "warn") + '">' + fmtC(r.delta) + "</span></td>" +
+      '<td class="num">' + r.rounds.length + "</td><td>" + (r.verdict === "excellent" ? "excellent" : "good") + "</td></tr>";
+  }
+  document.getElementById("repTable").innerHTML = rows;
+  const big = document.getElementById("verdictBig");
+  const sub = document.getElementById("verdictSub");
+  if (count === 0) { big.textContent = "No strings measured."; sub.textContent = "Run the wizard to collect results."; }
+  else {
+    const mw = Math.abs(worst);
+    big.textContent = mw <= CFG.excellent_tol_cents ? "Excellent." : (mw <= CFG.pass_tol_cents ? "Good." : "Close — one string is out.");
+    big.className = "v " + (mw <= CFG.pass_tol_cents ? "good" : "");
+    sub.textContent = count + " of " + ms.length + " strings set. Worst error " + fmtC(worst) + " on the " + (worstI >= 0 ? midiName(ms[worstI]) + " string" : "guitar") + ". " + (mw <= CFG.pass_tol_cents ? "Within ±3¢ everywhere — you're done. Play something." : "Re-run just that string to tighten it up.");
+  }
+}
+
+document.getElementById("btnCopy").addEventListener("click", function () {
+  const ms = midis();
+  let t = "tune-o-matic report — " + new Date().toISOString().slice(0, 10) + "\n";
+  t += "Guitar: " + S.guitarType + "-string · Tuning: " + tuning().label + " · A4 = " + S.a4 + " Hz\n";
+  for (let i = 0; i < ms.length; i++) {
+    const r = S.results[i];
+    t += (midiName(ms[i]) + ": ").padEnd(6) + (r ? fmtC(r.delta) + " (" + r.rounds.length + " rounds, " + r.verdict + ")" : "skipped") + "\n";
+  }
+  const btn = this;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(
+    () => { btn.textContent = "Copied ✓"; setTimeout(() => btn.textContent = "Copy report", 1600); },
+    () => {
+      const ta = document.createElement("textarea");
+      ta.value = t; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); btn.textContent = "Copied ✓"; setTimeout(() => btn.textContent = "Copy report", 1600); } catch (e) { alert(t); }
+      ta.remove();
+    }
+  );
+});
+
+/* ---------- advanced options (user tolerances, browser-local) ---------- */
+const ADV_KEY = "intonate.adv.v1";
+const ADV_FIELDS = [
+  ["advInTune", "in_tune_tol_cents"],
+  ["advPass", "pass_tol_cents"],
+  ["advExcel", "excellent_tol_cents"],
+  ["advTune", "tune_tol_cents"],
+  ["advHarm", "harmonic_tol_cents"],
+  ["advStable", "stable_ms"],
+];
+function advLoad() {
+  try { return JSON.parse(localStorage.getItem(ADV_KEY) || "null"); } catch (e) { return null; }
+}
+function advApply() {
+  const adv = advLoad();
+  // reset tolerances to deployment values first
+  for (const k of Object.keys(CFG_DEFAULTS)) CFG[k] = configFileValues[k] !== undefined ? configFileValues[k] : CFG_DEFAULTS[k];
+  if (adv) for (const [, key] of ADV_FIELDS) if (typeof adv[key] === "number") CFG[key] = adv[key];
+  // reflect into input boxes
+  for (const [id, key] of ADV_FIELDS) {
+    const el = document.getElementById(id);
+    if (el) el.value = (adv && typeof adv[key] === "number") ? adv[key] : "";
+  }
+  rebuildGauges();
+}
+function rebuildGauges() {
+  buildGaugeInto(document.getElementById("gauge"), "needle");
+  buildGaugeInto(document.getElementById("gaugeT"), "needleT");
+}
+document.getElementById("btnAdvSave").addEventListener("click", function () {
+  const adv = {};
+  let bad = [];
+  for (const [id, key] of ADV_FIELDS) {
+    const v = parseFloat(document.getElementById(id).value);
+    if (!isNaN(v) && v > 0) adv[key] = v;
+    else if (document.getElementById(id).value !== "") bad.push(id);
+  }
+  const stat = document.getElementById("advStatus");
+  if (bad.length) { stat.textContent = "Some values were invalid and ignored (must be positive numbers)."; stat.style.color = "#e6c07a"; }
+  else { stat.textContent = "Saved — applied now, kept in this browser."; stat.style.color = "var(--green)"; }
+  try { localStorage.setItem(ADV_KEY, JSON.stringify(adv)); } catch (e) {}
+  advApply();
+});
+document.getElementById("btnAdvReset").addEventListener("click", function () {
+  try { localStorage.removeItem(ADV_KEY); } catch (e) {}
+  document.getElementById("advStatus").textContent = "Reset to deployment defaults.";
+  document.getElementById("advStatus").style.color = "";
+  advApply();
+});
+
+/* ---------- wiring: welcome ---------- */
+function checkSecure() {
+  const warn = document.getElementById("secureWarn");
+  if (warn) warn.style.display = window.isSecureContext ? "none" : "";
+  const pub = warn && warn.querySelector(".pub");
+  if (pub && location.hostname && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    pub.textContent = "intonate." + (location.hostname.split(".").slice(1).join(".") || "yourdomain.com");
+  }
+}
+document.getElementById("btnStartTuner").addEventListener("click", function () { S._dest = "tuner"; show("input"); renderTuningOptions(); sizeCanvases(); checkSecure(); refreshDevices(); });
+document.getElementById("btnStartWizard").addEventListener("click", function () { beginWizard(false); });   // tutorial: simulated, no audio
+document.getElementById("btnResume").addEventListener("click", function () {
+  const saved = loadState();
+  if (!saved) return;
+  if (saved.demo || (saved.results && Object.values(saved.results).some(r => r && r.demo))) { clearState(); return; }
+  S.guitarType = saved.guitarType || 6; S.tuningId = saved.tuningId || "6-standard"; S.a4 = saved.a4 || 440;
+  S.si = saved.si || 0; S.phase = saved.phase || "tune-open";
+  S.round = saved.round || 1; S.rounds = saved.rounds || []; S.results = saved.results || {};
+  S._hc = (typeof saved._hc === "number") ? saved._hc : undefined;
+  S._lastDelta = (typeof saved._lastDelta === "number") ? saved._lastDelta : undefined;
+  S._pendingDelta = (typeof saved._pendingDelta === "number") ? saved._pendingDelta : undefined;
+  S.demo = false;
+  show("wizard");
+  sizeCanvases();
+  renderWizard();
+  showHint("ok", "Resumed your previous session. If audio isn't connected yet, the readout will stay quiet — use Tuner/Setup to grant access, or just play: the readout listens once audio is attached.");
+});
+
+/* ---------- wiring: input ---------- */
+const SENS_PRESETS = {
+  high:   { rms_gate: 0.0006, median_frames: 2 },
+  normal: { rms_gate: 0.0012, median_frames: 3 },
+  low:    { rms_gate: 0.0035, median_frames: 3 },
+};
+const CFG_DEFAULTS = JSON.parse(JSON.stringify(CFG));
+document.getElementById("selSens").addEventListener("change", function () {
+  const p = SENS_PRESETS[this.value] || SENS_PRESETS.normal;
+  for (const k of Object.keys(p)) CFG[k] = p[k];
+  // other keys revert to config.json/defaults so presets don't stack
+  for (const k of Object.keys(CFG_DEFAULTS)) if (!(k in p)) CFG[k] = configFileValues[k] !== undefined ? configFileValues[k] : CFG_DEFAULTS[k];
+});
+async function refreshDevices() {
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const sel = document.getElementById("selDevice");
+    const cur = sel.value;
+    sel.innerHTML = "";
+    const def = document.createElement("option");
+    def.value = ""; def.textContent = "Default microphone";
+    sel.appendChild(def);
+    let n = 0;
+    for (const d of devs) {
+      if (d.kind !== "audioinput") continue;
+      const o = document.createElement("option");
+      o.value = d.deviceId;
+      o.textContent = d.label || ("Input " + (++n));
+      sel.appendChild(o);
+    }
+    if (cur) sel.value = cur;
+  } catch (e) {}
+}
+document.getElementById("btnUseMic").addEventListener("click", async function () {
+  const err = document.getElementById("inputErr");
+  err.classList.remove("show");
+  if (!window.isSecureContext) {
+    err.textContent = "Blocked by the browser: this page is not a secure context (plain HTTP on a LAN address). Browsers only allow microphone/audio-interface access on HTTPS or localhost. Use http://localhost:8088 on the Pi's own browser, or the public HTTPS URL.";
+    err.classList.add("show");
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    err.textContent = "This browser doesn't expose audio input APIs (getUserMedia). Try a recent Chrome, Edge, Firefox, or Safari — or use the guided preview below.";
+    err.classList.add("show");
+    return;
+  }
+  this.disabled = true;
+  try {
+    await startAudio(document.getElementById("selDevice").value || undefined);
+    this.textContent = "Listening…";
+    await refreshDevices();
+    document.getElementById("btnGoTuner").disabled = false;
+    document.getElementById("btnGoWizard").disabled = false;
+    document.getElementById("inputHint").innerHTML = "Level meter moving? Play a note — then start the tool you came for. You can change the input device above (takes effect when you re-click Listen).";
+  } catch (e) {
+    const name = (e && e.name) || "";
+    let msg = "Couldn't access audio: " + (name ? name + " — " + e.message : String(e)) + ".";
+    if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError") {
+      msg = "The device was found but couldn't be opened: " + e.message + ". This almost always means another app is holding the input — close anything else using the Apogee (a DAW, Zoom/Discord/Teams voice, or the Windows 'Listen to this device' option) and click Listen again. If that doesn't do it, unplug the interface, plug it back in, and retry. On Windows, the Jam+ sometimes needs the Apogee driver panel closed too.";
+    } else if (name === "NotFoundError") {
+      msg = "No input device found. Plug the interface in (or re-select it above) and try again.";
+    } else if (name === "NotAllowedError" || name === "SecurityError") {
+      msg = "Permission denied. Reload the page and grant access when the browser prompts; the site is on HTTPS so the prompt should appear.";
+    } else if (name === "OverconstrainedError") {
+      msg = "The selected device rejected the audio settings. Re-select it above and click Listen — the tool now retries with looser settings automatically.";
+    }
+    err.textContent = msg;
+    err.classList.add("show");
+  } finally {
+    this.disabled = false;
+  }
+});
+document.getElementById("selDevice").addEventListener("change", async function () {
+  if (!A.running) return;
+  const err = document.getElementById("inputErr");
+  err.classList.remove("show");
+  try {
+    await startAudio(this.value || undefined);
+  } catch (e) {
+    const name = (e && e.name) || "";
+    err.textContent = "Couldn't switch to the selected device: " + (name ? name + " — " + e.message : String(e)) + ". If it's an interface like the Apogee, close other apps holding it and try again. The previous device keeps working meanwhile.";
+    err.classList.add("show");
+  }
+});
+document.getElementById("selGuitar").addEventListener("change", function () {
+  S.guitarType = parseInt(this.value, 10);
+  renderTuningOptions();
+});
+document.getElementById("selTuning").addEventListener("change", function () { S.tuningId = this.value; });
+document.getElementById("selA4").addEventListener("change", function () { S.a4 = parseInt(this.value, 10); updateA4Note(); });
+
+document.getElementById("btnGoTuner").addEventListener("click", function () {
+  S.demo = false;
+  S.tuned = {}; S.pin = -1;
+  clearState();
+  show("tuner");
+  sizeCanvases();
+  renderTunerChips();
+});
+document.getElementById("btnGoWizard").addEventListener("click", function () { beginWizard(true); });
+document.getElementById("btnDemo").addEventListener("click", function () { beginWizard(false); });
+
+function beginWizard(withAudio) {
+  S.demo = !withAudio;
+  S.si = 0; S.rounds = []; S.round = 1; S.results = {}; S.demoSeqIdx = 0;
+  S._hc = undefined; S._lastDelta = undefined; S._pendingDelta = undefined;
+  clearState();
+  if (!withAudio) stopAudio();
+  show("wizard");
+  sizeCanvases();
+  if (S.demo) {
+    demoStep = 0;
+    setPhase("tune-open");   // renderWizard inside will kick runDemoStep
+  } else {
+    setPhase("tune-open");
+  }
+}
+
+/* ---------- wiring: tabs ---------- */
+function goTab(which) {
+  if (S.screen === "welcome" || S.screen === "input") { S._dest = which; renderTuningOptions(); show("input"); sizeCanvases(); refreshDevices(); return; }
+  if (S.screen === "done") { show("input"); return; }
+  if (which === "tuner") { show("tuner"); sizeCanvases(); renderTunerChips(); }
+  else { show("wizard"); sizeCanvases(); renderWizard(); }
+}
+for (const [id, which] of [["tabTuner","tuner"],["tabTuner2","tuner"],["tabTuner3","tuner"],["tabWizard","wizard"],["tabWizard2","wizard"],["tabWizard3","wizard"]]) {
+  document.getElementById(id).addEventListener("click", () => goTab(which));
+}
+
+/* ---------- wiring: wizard misc ---------- */
+document.getElementById("btnSkip").addEventListener("click", nextString);
+document.getElementById("btnRestart2").addEventListener("click", restartAll);
+document.getElementById("btnRestart3").addEventListener("click", restartAll);
+function restartAll() {
+  stopAudio(); clearState();
+  S.demo = false; demoStep = 0; cancelAnimationFrame(demoTimer);
+  S.si = 0; S.rounds = []; S.round = 1; S.results = {}; S.phase = "tune-open"; S.demoSeqIdx = 0;
+  S.tuned = {}; S.pin = -1;
+  show("welcome");
+}
+document.getElementById("btnTunerReset").addEventListener("click", function () { S.tuned = {}; renderTunerChips(); });
+document.getElementById("btnTunerInput").addEventListener("click", function () { show("input"); renderTuningOptions(); sizeCanvases(); });
+
+/* ---------- theme system ---------- */
+const THEME_KEY = "intonate.theme";
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+}
+document.getElementById("themeToggle").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme") || "dark";
+  applyTheme(cur === "dark" ? "light" : "dark");
+});
+(function themeInit() {
+  let t = "dark";
+  try { t = localStorage.getItem(THEME_KEY) || "dark"; } catch (e) {}
+  document.documentElement.setAttribute("data-theme", t);
+})();
+/* mobile pull-to-refresh: never restore stale scroll, always start at top */
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+window.addEventListener("beforeunload", () => window.scrollTo(0, 0));
+window.addEventListener("load", () => { setTimeout(() => window.scrollTo(0, 0), 0); });
+window.addEventListener("pageshow", (e) => { window.scrollTo(0, 0); });
+
+/* ---------- init ---------- */
+(function init() {
+  const boot = loadConfig().catch(() => {}).then(() => {
+  advApply();   // apply user tolerances over config.json defaults
+  buildLedInto(document.getElementById("led7"));
+  buildLedInto(document.getElementById("led7T"));
+  ledSet(document.getElementById("led7"), "-");
+  ledSet(document.getElementById("led7T"), "-");
+  rebuildGauges();
+  renderTuningOptions();
+  if (CFG.theme) applyTheme(CFG.theme);
+  if (CFG.led_color) document.documentElement.style.setProperty('--led', CFG.led_color);
+  const saved = loadState();
+  if (saved && !saved.demo && !(saved.results && Object.values(saved.results).some(r => r && r.demo)) &&
+      ((Object.keys(saved.results || {}).length > 0) || (saved.round || 1) > 1 || ["harmonic", "fretted", "adjust"].includes(saved.phase || ""))) {
+    document.getElementById("btnResume").style.display = "";
+  }
+  sizeCanvases();
+  show("welcome");
+  // debug/QA hooks (harmless in production)
+  window.__intonate = {
+    state: S, audio: A,
+    yin: yinDetect,
+    capture: (c) => onCapture(c),
+    setPhase: (p) => setPhase(p),
+    show: show,
+    targetOpen: targetOpen,
+    targetOct: targetOct,
+    midiToFreq: midiToFreq,
+    nearest: nearestString,
+    tunerTrack: tunerTrack,
+    renderTunerChips: renderTunerChips,
+    cfg: CFG,
+  };
+  });
+})();
+</script>
+</body>
+</html>

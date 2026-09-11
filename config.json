@@ -1,0 +1,20 @@
+{
+  "_comment": "Intonate tunables. Delete a key to fall back to the built-in default. Edits take effect on next page load — no service restart needed. Sensitivity presets in the app (High/Normal/Low) override rms_gate and median_frames while selected.",
+  "theme": "dark",
+  "led_color": "#ff2a1a",
+  "rms_gate": 0.0008,
+  "median_frames": 3,
+  "stable_ms": 350,
+  "stable_spread_cents": 10,
+  "capture_window_cents": 60,
+  "in_tune_tol_cents": 3,
+  "tune_tol_cents": 4,
+  "harmonic_tol_cents": 8,
+  "pass_tol_cents": 3,
+  "excellent_tol_cents": 1.5,
+  "ghost_guard_ms": 1200,
+  "min_freq_hz": 50,
+  "max_freq_hz": 1600,
+  "yin_threshold": 0.13,
+  "accidental_pref": "auto"
+}
