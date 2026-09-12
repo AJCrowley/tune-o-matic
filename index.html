@@ -73,7 +73,7 @@
 
   /* 7-seg LED note window, recessed into the face */
   .ledwin {
-    position: absolute; left: 43.6%; top: 17.5%; width: 13%; height: 11%;
+    position: absolute; left: 43.6%; top: 20.33%; width: 13%; height: 11%;
     background: linear-gradient(180deg, #100604, #1c0c06);
     border-radius: 6px; border: 2px solid rgba(0,0,0,.85);
     box-shadow: inset 0 3px 8px rgba(0,0,0,.95), inset 0 -1px 2px rgba(255,180,90,.12), 0 1px 1px rgba(255,220,150,.3);
@@ -1228,15 +1228,19 @@ function renderWizardStatic() {
 
 /* ---------- UI: gauges (aligned to raster meter art, viewBox 605x600) ---------- */
 /* ---------- UI: gauges (aligned to raster meter art, viewBox 605x600) ---------- */
-const MX = 302, MY = 404;          // needle pivot in artwork px (artwork's movement)
+const MX = 302.5, MY = 408;      // needle origin: centre, 408px down the artwork (Kris-specified)
 const LED_RC_X = 298.1, LED_RC_Y = 310.0;  // strobe-ring centre: circle THROUGH the 3 rivet centres (measured)
 const LED_RR = 256.6;              // ring radius: intersects the rivets at their centres exactly
 const RIVET_ANG = [270.6, 150.4, 29.4];    // rivet angles on the ring (deg; 0 = 3 o'clock)
-const SWEEP = 78.2;                // degrees each side of vertical — at the stops the needle's outer edge
-                                   // rests against the OUTSIDE of the stop screws: solved from screw centre
-                                   // (110,1)px from pivot, screw r=19, blade half-width 4.46 at that radius
-/* point on the pivot-centred tip circle — the whole scale follows the needle tip now */
-function fracToAngle(frac) { return frac * SWEEP; }   // deg, -SWEEP..+SWEEP
+const BLADE_R = 235;               // tip radius: full-length blade; base hidden behind the brass screw
+const SWEEP_P = 75.28, SWEEP_N = 75.72;    // degrees each side: outer edge rests against the stop screws'
+                                   // outer surface (+0.5px clearance), solved from screw centres
+                                   // (110,-3) & (-112,-3) from origin, screw r=19, blade half-width 5.4 there
+const MECH_CLIP = "M 215 445 L 215 411 L 220 409 L 225 409 L 230 409 L 235 389 L 240 373 L 245 364 L 250 358 L 255 353 L 260 349 L 265 345 L 270 342 L 275 340 L 280 339 L 285 337 L 290 337 L 295 336 L 300 336 L 305 336 L 310 337 L 315 338 L 320 339 L 325 341 L 330 343 L 335 346 L 340 350 L 345 354 L 350 360 L 355 367 L 360 377 L 365 407 L 370 409 L 375 410 L 380 410 L 385 413 L 385 445 Z";
+                                   // movement-housing silhouette (measured): the needle base hides
+                                   // behind the housing; the brass screw caps it at (302.5,390) r~12
+/* asymmetric stops: positive and negative sides have their own sweep angles */
+function fracToAngle(frac) { return frac >= 0 ? frac * SWEEP_P : frac * SWEEP_N; }
 function polarArt(r, frac) {
   const th = (-90 + fracToAngle(frac)) * Math.PI / 180;
   return [MX + r * Math.cos(th), MY + r * Math.sin(th)];
@@ -1265,8 +1269,6 @@ function centsToNeedle(c, tol) {
 let ledAngle = 0;   // persistent strobe phase
 function buildGaugeInto(svgEl, needleId) {
   const cx = MX, cy = MY;
-  const tol = CFG.in_tune_tol_cents;
-  const tolF = centsToNeedle(tol, tol);
   let svg = "";
   svg += `<defs>
     <linearGradient id="${needleId}Blade" x1="0" y1="0" x2="1" y2="0">
@@ -1285,10 +1287,8 @@ function buildGaugeInto(svgEl, needleId) {
       <stop offset="0.92" stop-color="#0b0908"/>
       <stop offset="1" stop-color="#040302"/>
     </radialGradient>
-    <radialGradient id="${needleId}Off" cx="0.38" cy="0.34" r="0.78">
-      <stop offset="0" stop-color="#5a1810"/>
-      <stop offset="0.55" stop-color="#380d07"/>
-      <stop offset="1" stop-color="#1c0603"/>
+    <radialGradient id="${needleId}Off" cx="0.38" cy="0.34" r="0.85">
+      <stop offset="0" stop-color="#ff8a70"/><stop offset="0.35" stop-color="#c33522"/><stop offset="0.8" stop-color="#7a1409"/><stop offset="1" stop-color="#420a04"/>
     </radialGradient>
     <radialGradient id="${needleId}OnG" cx="0.38" cy="0.34" r="0.85">
       <stop offset="0" stop-color="#eafff2"/><stop offset="0.35" stop-color="#8cf0b0"/><stop offset="0.8" stop-color="#1e8c46"/><stop offset="1" stop-color="#0a4d24"/>
@@ -1299,6 +1299,7 @@ function buildGaugeInto(svgEl, needleId) {
     <radialGradient id="${needleId}OnR" cx="0.38" cy="0.34" r="0.85">
       <stop offset="0" stop-color="#ffe2d0"/><stop offset="0.35" stop-color="#ff7a52"/><stop offset="0.8" stop-color="#e3250f"/><stop offset="1" stop-color="#7a1409"/>
     </radialGradient>
+    <mask id="${needleId}Mech"><rect x="0" y="0" width="605" height="600" fill="#fff"/><path d="${MECH_CLIP}" fill="#000"/></mask>
   </defs>`;
   // LED strobe ring: moulded 3D lamps on the rivet circle (off state visible, lit state glows)
   svg += `<g id="${needleId}Ring">`;
@@ -1321,34 +1322,19 @@ function buildGaugeInto(svgEl, needleId) {
       `</g>`;
   }
   svg += `</g>`;
-  // ticks: pivot-centred, band 168..184 straddles the needle-tip circle (r=178); zero marked by the wedge
-  for (let c = -200; c <= 200; c += 25) {
-    if (c === 0) continue;   // the green tolerance wedge marks zero
-    const f = centsToNeedle(c, tol);
-    const major = (c % 100 === 0);
-    const [x1, y1] = polarArt(168, f);
-    const [x2, y2] = polarArt(184, f);
-    svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(70,35,12,0.85)" stroke-width="${major ? 2.4 : 1.4}"/>`;
-    if (c === 0 || Math.abs(c) === 50) {
-      const [tx, ty] = polarArt(200, f);
-      svg += `<text x="${tx.toFixed(1)}" y="${(ty + 5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="600" class="gtick">${c > 0 ? '+' + c : (c < 0 ? '\u2212' + Math.abs(c) : c)}</text>`;
-    }
-  }
-  // tolerance band wedge on the tip circle (needle rests in the green when in tune)
-  svg += `<path d="${arcArt(178, -tolF, tolF, 20)}" fill="none" stroke="rgba(30,140,70,0.85)" stroke-width="6" stroke-linecap="round"/>`;
-  // needle assembly: ONE group rotates together (shadow + blade + highlight + bevel)
-  svg += `<g id="${needleId}Grp">`;
+  // face carries NO drawn marks — Kris bakes the markings into the artwork (LED window + needle only)
+  // needle assembly: ONE group rotates together (shadow + blade + highlight + bevel),
+  // clipped to the movement-housing silhouette so the base hides behind the brass screw
+  svg += `<g id="${needleId}Grp" mask="url(#${needleId}Mech)">`;
   // shadow (slightly offset toward lower-right, light comes upper-left)
-  svg += `<path id="${needleId}Shadow" d="M ${cx - 6} ${cy + 3} L ${cx - 2} ${cy - 172} L ${cx + 2} ${cy - 172} L ${cx + 6} ${cy + 3} Z" fill="rgba(25,8,4,0.6)" filter="url(#${needleId}Blur)" transform="translate(7,6)" opacity="0.9"/>`;
-  // blade — tip radius 178: outer edge meets the stop screws' outside at ±SWEEP
-  svg += `<path id="${needleId}" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 174} L ${cx} ${cy - 178} L ${cx + 2.4} ${cy - 174} L ${cx + 8} ${cy + 4} Z" fill="url(#${needleId}Blade)" stroke="rgba(40,15,8,0.6)" stroke-width="1"/>`;
+  svg += `<path id="${needleId}Shadow" d="M ${cx - 6} ${cy + 3} L ${cx - 2} ${cy - 229} L ${cx + 2} ${cy - 229} L ${cx + 6} ${cy + 3} Z" fill="rgba(25,8,4,0.6)" filter="url(#${needleId}Blur)" transform="translate(7,6)" opacity="0.9"/>`;
+  // blade — full length (tip 235) per Kris: it may pass over the LED window; base hidden by the mask
+  svg += `<path id="${needleId}" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 231} L ${cx} ${cy - 235} L ${cx + 2.4} ${cy - 231} L ${cx + 8} ${cy + 4} Z" fill="url(#${needleId}Blade)" stroke="rgba(40,15,8,0.6)" stroke-width="1"/>`;
   // lengthwise specular highlight (ref1: light catches mid-blade) — strong, visible at small sizes
-  svg += `<path id="${needleId}Hi" d="M ${cx + 0.6} ${cy + 2} L ${cx + 1.6} ${cy - 170} L ${cx + 3.4} ${cy - 172} L ${cx + 5.2} ${cy + 2} Z" fill="rgba(255,200,135,0.95)"/>`;
+  svg += `<path id="${needleId}Hi" d="M ${cx + 0.6} ${cy + 2} L ${cx + 1.6} ${cy - 227} L ${cx + 3.4} ${cy - 229} L ${cx + 5.2} ${cy + 2} Z" fill="rgba(255,200,135,0.95)"/>`;
   // dark left edge (bevel shadow side)
-  svg += `<path id="${needleId}Lo" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 174} L ${cx - 1.4} ${cy - 174} L ${cx - 4.6} ${cy + 4} Z" fill="rgba(28,9,5,0.95)"/>`;
+  svg += `<path id="${needleId}Lo" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 231} L ${cx - 1.4} ${cy - 231} L ${cx - 4.6} ${cy + 4} Z" fill="rgba(28,9,5,0.95)"/>`;
   svg += `</g>`;
-  // red pivot hub drawn on top (hides blade base, per ref1) — outside the rotating group
-  svg += `<circle cx="${cx}" cy="${cy}" r="16" fill="#6b1f1a"/><circle cx="${cx}" cy="${cy}" r="10" fill="#8d2c22"/><circle cx="${cx}" cy="${cy}" r="3.5" fill="#43100c"/>`;
   svgEl.innerHTML = svg;
 }
 let lastCents = 0;
