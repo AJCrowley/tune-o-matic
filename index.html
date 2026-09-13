@@ -113,7 +113,7 @@
     flex: 1; text-align: center; font: inherit; font-size: 15px; font-weight: 600;
     color: var(--fg-dim); background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: 11px 8px; cursor: pointer;
-    transition: color .12s, border-color .12s;
+    transition: color .2s, border-color .2s, background-color .2s, box-shadow .2s;
   }
   .tab:hover { color: var(--fg); }
   .tab.active { color: var(--amber); border-color: var(--amber-dim); box-shadow: 0 0 0 1px var(--amber-dim); }
@@ -137,18 +137,20 @@
     display: inline-block; appearance: none; border: none; cursor: pointer;
     font: inherit; font-weight: 600; font-size: 15.5px;
     background: var(--amber); color: #14161a;
-    padding: 12px 22px; border-radius: 10px; transition: transform .06s, box-shadow .15s;
+    padding: 12px 22px; border-radius: 10px; transition: transform .2s, box-shadow .2s, background-color .2s, border-color .2s, color .2s, opacity .2s, filter .2s;
   }
   .btn:hover { box-shadow: 0 0 0 4px rgba(232,163,61,0.18); }
   .btn:active { transform: translateY(1px); }
   .btn.big { font-size: 17px; padding: 14px 26px; }
   .btn.ghost {
-    background: transparent; color: var(--fg-dim); border: 1px solid var(--line);
+    background: var(--panel2); color: var(--fg); border: 1px solid var(--fg-faint);
     font-weight: 500; padding: 11px 18px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 1px 0 rgba(0,0,0,.22);
   }
-  .btn.ghost:hover { color: var(--fg); box-shadow: none; border-color: var(--fg-faint); }
+  .btn.ghost:hover { background: var(--panel2); color: var(--fg); filter: brightness(.93); border-color: var(--amber); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 3px 8px rgba(0,0,0,.28), 0 0 0 4px rgba(232,163,61,.22); }
   .btn.demo { background: transparent; color: var(--amber); border: 1px dashed var(--amber-dim); font-weight: 500; }
   .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+  .btn:focus-visible, .tab:focus-visible, .themeswitch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--amber); }
   .btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
 
   .screen { display: none; }
@@ -160,6 +162,7 @@
     padding: 11px 12px; outline: none;
   }
   select:focus { border-color: var(--amber-dim); }
+  select:focus-visible, input.sel:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--amber); }
   label.lbl { display: block; font-size: 12.5px; color: var(--fg-faint); text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 6px; font-weight: 600; }
 
   .meter { height: 10px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; margin-top: 8px; }
@@ -172,7 +175,9 @@
     min-width: 56px; padding: 7px 10px 6px; border-radius: 10px;
     background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--fg-dim);
     cursor: pointer; user-select: none;
+    transition: border-color .2s, background-color .2s, box-shadow .2s;
   }
+  .chip:hover { border-color: var(--fg-faint); }
   .chip .nm { font-weight: 700; font-size: 14px; color: var(--fg); letter-spacing: .03em; }
   .chip .st { font-size: 10.5px; min-height: 13px; }
   .chip.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
@@ -270,7 +275,7 @@
       </ul>
       <div class="btnrow">
         <button class="btn big" id="btnStartWizard">Run the tutorial</button>
-        <button class="btn ghost big" id="btnStartTuner">Open the tuner</button>
+        <button class="btn ghost big" id="btnStartTuner">Open the app</button>
         <button class="btn ghost" id="btnResume" style="display:none">Resume wizard session</button>
       </div>
       <p class="sub" style="margin-top:8px">The tutorial is fully simulated — no microphone, no audio access, nothing to plug in. Just watch the meter and follow along.</p>
