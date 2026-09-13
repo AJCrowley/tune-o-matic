@@ -1292,8 +1292,10 @@ function buildGaugeInto(svgEl, needleId) {
       <stop offset="1" stop-color="#040302"/>
     </radialGradient>
     <radialGradient id="${needleId}Off" cx="0.38" cy="0.34" r="0.85">
-      <stop offset="0" stop-color="#ff8a70"/><stop offset="0.35" stop-color="#c33522"/><stop offset="0.8" stop-color="#7a1409"/><stop offset="1" stop-color="#420a04"/>
+      <stop offset="0" stop-color="#e9e9ec"/><stop offset="0.35" stop-color="#b4b4bc"/><stop offset="0.8" stop-color="#6c6c76"/><stop offset="1" stop-color="#3c3c46"/>
     </radialGradient>
+                                   <!-- clear-lens LED: transparent grey when off; colour only when lit -->
+                                   <!-- lit ramp: red (far) -> amber (closing) -> green (in tune) -->
     <radialGradient id="${needleId}OnG" cx="0.38" cy="0.34" r="0.85">
       <stop offset="0" stop-color="#eafff2"/><stop offset="0.35" stop-color="#8cf0b0"/><stop offset="0.8" stop-color="#1e8c46"/><stop offset="1" stop-color="#0a4d24"/>
     </radialGradient>
