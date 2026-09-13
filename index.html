@@ -1236,7 +1236,8 @@ const LV_DOT_XS = [262.2, 274.5, 286.5, 298.6, 310.5, 321.7, 334.0];  // the art
 const LV_DOT_Y = 465.2;                       // (measured) — lit overlays drawn exactly on them
 const LV_DOT_COLS = ["#4ade80", "#4ade80", "#4ade80", "#4ade80", "#e8a33d", "#ef8d53", "#f87171"];
                                    // per-dot colour fixed by position, same ramp as the level bar
-const BLADE_R = 235;               // tip radius: full-length blade; base hidden behind the brass screw
+const BLADE_R = 273;               // tip radius: reaches toward the dial edge; beyond ~62 deg deflection
+                                   // the tip passes BEHIND the LED ring (ring drawn after the needle)
 const SWEEP_P = 75.28, SWEEP_N = 75.72;    // degrees each side: outer edge rests against the stop screws'
                                    // outer surface (+0.5px clearance), solved from screw centres
                                    // (110,-3) & (-112,-3) from origin, screw r=19, blade half-width 5.4 there
@@ -1292,9 +1293,12 @@ function buildGaugeInto(svgEl, needleId) {
       <stop offset="1" stop-color="#040302"/>
     </radialGradient>
     <radialGradient id="${needleId}Off" cx="0.38" cy="0.34" r="0.85">
-      <stop offset="0" stop-color="#e9e9ec"/><stop offset="0.35" stop-color="#b4b4bc"/><stop offset="0.8" stop-color="#6c6c76"/><stop offset="1" stop-color="#3c3c46"/>
+      <stop offset="0" stop-color="#8e8e98"/><stop offset="0.35" stop-color="#565661"/><stop offset="0.8" stop-color="#33333d"/><stop offset="1" stop-color="#212129"/>
     </radialGradient>
-                                   <!-- clear-lens LED: transparent grey when off; colour only when lit -->
+    <radialGradient id="${needleId}OffGloss" cx="0.42" cy="0.30" r="0.72">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.85"/><stop offset="0.45" stop-color="#ffffff" stop-opacity="0.22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+                                   <!-- clear-lens LED: smoked glass when off (gloss over the dome); -->
                                    <!-- lit ramp: red (far) -> amber (closing) -> green (in tune) -->
     <radialGradient id="${needleId}OnG" cx="0.38" cy="0.34" r="0.85">
       <stop offset="0" stop-color="#eafff2"/><stop offset="0.35" stop-color="#8cf0b0"/><stop offset="0.8" stop-color="#1e8c46"/><stop offset="1" stop-color="#0a4d24"/>
@@ -1308,7 +1312,27 @@ function buildGaugeInto(svgEl, needleId) {
     <mask id="${needleId}Mech"><rect x="0" y="0" width="605" height="600" fill="#fff"/><path d="${MECH_CLIP}" fill="#000"/></mask>
     <filter id="${needleId}DotGlow" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="1.4"/></filter>
   </defs>`;
-  // LED strobe ring: moulded 3D lamps on the rivet circle (off state visible, lit state glows)
+  // level dots: light up the artwork's own 7 gray dots in place — no bevel, no resize, overlay only
+  svg += `<g id="${needleId}LvDots">`;
+  for (let i = 0; i < 7; i++) {
+    svg += `<circle id="${needleId}LvDot${i}" cx="${LV_DOT_XS[i]}" cy="${LV_DOT_Y}" r="2.6" fill="${LV_DOT_COLS[i]}" opacity="0" filter="url(#${needleId}DotGlow)"/>`;
+  }
+  svg += `</g>`;
+  // face carries NO drawn marks — Kris bakes the markings into the artwork (LED window + needle only)
+  // needle assembly: ONE group rotates together (shadow + blade + highlight + bevel),
+  // clipped to the movement-housing silhouette so the base hides behind the brass screw
+  svg += `<g id="${needleId}Grp" mask="url(#${needleId}Mech)">`;
+  // shadow (slightly offset toward lower-right, light comes upper-left)
+  svg += `<path id="${needleId}Shadow" d="M ${cx - 6} ${cy + 3} L ${cx - 2} ${cy - 267} L ${cx + 2} ${cy - 267} L ${cx + 6} ${cy + 3} Z" fill="rgba(25,8,4,0.6)" filter="url(#${needleId}Blur)" transform="translate(7,6)" opacity="0.9"/>`;
+  // blade — full length (tip 235) per Kris: it may pass over the LED window; base hidden by the mask
+  svg += `<path id="${needleId}" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 231} L ${cx - 2.4} ${cy - 269} L ${cx} ${cy - 273} L ${cx + 2.4} ${cy - 269} L ${cx + 2.4} ${cy - 231} L ${cx + 8} ${cy + 4} Z" fill="url(#${needleId}Blade)" stroke="rgba(40,15,8,0.6)" stroke-width="1"/>`;
+  // lengthwise specular highlight (ref1: light catches mid-blade) — strong, visible at small sizes
+  svg += `<path id="${needleId}Hi" d="M ${cx + 0.6} ${cy + 2} L ${cx + 1.6} ${cy - 265} L ${cx + 3.4} ${cy - 267} L ${cx + 5.2} ${cy + 2} Z" fill="rgba(255,200,135,0.95)"/>`;
+  // dark left edge (bevel shadow side)
+  svg += `<path id="${needleId}Lo" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 231} L ${cx - 2.4} ${cy - 269} L ${cx - 1.4} ${cy - 269} L ${cx - 1.4} ${cy - 231} L ${cx - 4.6} ${cy + 4} Z" fill="rgba(28,9,5,0.95)"/>`;
+  svg += `</g>`;
+  // LED strobe ring: moulded 3D lamps on the rivet circle — drawn AFTER the needle so the
+  // blade tip passes behind the lamps at extreme deflection (bezel ring is in front of the needle)
   svg += `<g id="${needleId}Ring">`;
   const N = 36;
   for (let i = 0; i < N; i++) {
@@ -1324,29 +1348,11 @@ function buildGaugeInto(svgEl, needleId) {
       `<circle r="6.4" fill="none" stroke="rgba(255,225,180,0.10)" stroke-width="1"/>` +
       `<circle class="domeoff" r="5.6" fill="url(#${needleId}Off)"/>` +
       `<circle class="domeon" r="5.6" fill="url(#${needleId}OnR)" opacity="0"/>` +
+      `<circle class="gloss" r="5.6" fill="url(#${needleId}OffGloss)"/>` +
       `<circle class="bloom" r="8.5" fill="#e3250f" opacity="0" filter="url(#${needleId}Glow)"/>` +
       `<ellipse cx="-1.6" cy="-2.2" rx="2.1" ry="1.5" fill="rgba(255,255,255,0.30)"/>` +
       `</g>`;
   }
-  svg += `</g>`;
-  // level dots: light up the artwork's own 7 gray dots in place — no bevel, no resize, overlay only
-  svg += `<g id="${needleId}LvDots">`;
-  for (let i = 0; i < 7; i++) {
-    svg += `<circle id="${needleId}LvDot${i}" cx="${LV_DOT_XS[i]}" cy="${LV_DOT_Y}" r="2.6" fill="${LV_DOT_COLS[i]}" opacity="0" filter="url(#${needleId}DotGlow)"/>`;
-  }
-  svg += `</g>`;
-  // face carries NO drawn marks — Kris bakes the markings into the artwork (LED window + needle only)
-  // needle assembly: ONE group rotates together (shadow + blade + highlight + bevel),
-  // clipped to the movement-housing silhouette so the base hides behind the brass screw
-  svg += `<g id="${needleId}Grp" mask="url(#${needleId}Mech)">`;
-  // shadow (slightly offset toward lower-right, light comes upper-left)
-  svg += `<path id="${needleId}Shadow" d="M ${cx - 6} ${cy + 3} L ${cx - 2} ${cy - 229} L ${cx + 2} ${cy - 229} L ${cx + 6} ${cy + 3} Z" fill="rgba(25,8,4,0.6)" filter="url(#${needleId}Blur)" transform="translate(7,6)" opacity="0.9"/>`;
-  // blade — full length (tip 235) per Kris: it may pass over the LED window; base hidden by the mask
-  svg += `<path id="${needleId}" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 231} L ${cx} ${cy - 235} L ${cx + 2.4} ${cy - 231} L ${cx + 8} ${cy + 4} Z" fill="url(#${needleId}Blade)" stroke="rgba(40,15,8,0.6)" stroke-width="1"/>`;
-  // lengthwise specular highlight (ref1: light catches mid-blade) — strong, visible at small sizes
-  svg += `<path id="${needleId}Hi" d="M ${cx + 0.6} ${cy + 2} L ${cx + 1.6} ${cy - 227} L ${cx + 3.4} ${cy - 229} L ${cx + 5.2} ${cy + 2} Z" fill="rgba(255,200,135,0.95)"/>`;
-  // dark left edge (bevel shadow side)
-  svg += `<path id="${needleId}Lo" d="M ${cx - 8} ${cy + 4} L ${cx - 2.4} ${cy - 231} L ${cx - 1.4} ${cy - 231} L ${cx - 4.6} ${cy + 4} Z" fill="rgba(28,9,5,0.95)"/>`;
   svg += `</g>`;
   svgEl.innerHTML = svg;
 }
