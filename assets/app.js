@@ -757,9 +757,12 @@ function renderWizardStatic() {
 
 /* ---------- UI: gauges (aligned to raster meter art, viewBox 605x600) ---------- */
 const MX = 300, MY = 410;        // needle origin: brass bearing centre, v2 art (Kasa fits + blob agree, 2026-09-15)
-const LED_RC_X = 297.0, LED_RC_Y = 312.4;  // strobe-ring centre: circle THROUGH the 3 rivet centres (v2 mean, both themes)
-const LED_RR = 255.3;              // ring radius: intersects the rivets at their centres exactly (v2 mean)
-const RIVET_ANG = [270.3, 151.1, 29.3];    // rivet angles on the ring (deg; 0 = 3 o'clock) — v2 measured
+const LED_RC_X = 296.5, LED_RC_Y = 315.3;  // strobe ring: CIRCUMCIRCLE through the 3 rivet domes
+                                   // (dome-circle fits per art: dark (296.2,316.4) R254.2,
+                                   // light (296.8,314.3) R253.3 — averaged)
+const LED_RR = 253.7;              // ring radius: intersects the rivets at their centres exactly
+const RIVET_ANG = [270, 150, 30];  // rivet slots: exact 10° grid, 120° apart (12 lamp slots) —
+                                   // measured off the art at 270.0/150.0/30.0 from the disc centre
 const LV_DOT_XS = [261.9, 274.0, 286.1, 298.2, 310.0, 322.0, 333.9];  // the artwork's 7 gray dots (v2 light row)
 const LV_DOT_Y = 456.0;                       // v2 dot row (was 465.2 in v1 art)
 const LV_DOT_COLS = ["#4ade80", "#4ade80", "#4ade80", "#4ade80", "#e8a33d", "#ef8d53", "#f87171"];
