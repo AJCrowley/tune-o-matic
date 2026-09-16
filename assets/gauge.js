@@ -759,7 +759,7 @@ function renderWizardStatic() {
 const MX = 300, MY = 410;        // needle origin: brass bearing centre, v2 art (Kasa fits + blob agree, 2026-09-15)
 const LED_RC_X = 299.0, LED_RC_Y = 303.6;  // strobe ring: circumcircle through Kris's measured
                                    // rivet centres: top (300,51), left (78,426), right (520,426)
-const LED_RR = 252.6;              // ring radius: intersects the rivets at their centres exactly
+const LED_RR = 255.6;              // ring radius: intersects the rivets at their centres exactly
 const RIVET_ANG = [270, 150, 30];  // rivet slots: exact 10° grid, 120° apart (12 lamp slots) —
                                    // measured off the art at 270.0/150.0/30.0 from the disc centre
 const LV_DOT_XS = [261.9, 274.0, 286.1, 298.2, 310.0, 322.0, 333.9];  // the artwork's 7 gray dots (v2 light row)
