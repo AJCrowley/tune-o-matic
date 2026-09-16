@@ -137,10 +137,10 @@ canvas.wave {
 /* 7-seg LED note window, recessed into the face */
 .ledwin {
     position: absolute;
-    left: 39.6%;
+    left: 41.8%;
     top: 78%;
-    width: 19.7%;
-    height: 50px;
+    width: 15%;
+    height: 11%;
     background: linear-gradient(180deg, #100604, #1c0c06);
     border-radius: 6px;
     border: 1px solid rgba(0, 0, 0, .9);
