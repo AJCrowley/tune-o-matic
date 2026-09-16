@@ -138,7 +138,7 @@ function fmtC(c) { const v = Math.abs(c) < 0.05 ? 0 : c; return (v > 0 ? "+" : "
 const LS_KEY = "intonate.v2";
 /* Config file: put config.json next to index.html to override any tunable.
    Example: { "rms_gate": 0.0008, "stable_ms": 400 } — keys not present keep defaults. */
-const CONFIG_URL = "assets/config.json";
+const CONFIG_URL = "assets/gauge-config.json";
 let configLoaded = null;
 let configFileValues = {};   // what config.json actually set (for preset switching)
 function loadConfig() {
