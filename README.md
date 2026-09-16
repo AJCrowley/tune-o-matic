@@ -1,6 +1,6 @@
 # tune-o-matic
 
-© Kris McCann <kris@8pi.ca> 2026. [Buy me a coffee](https://buymeacoffee.com/ajcrowley)
+© Kris McCann <kris@8pi.ca> 2026. [Buy me a coffee](https://buymeacoffee.com/ajcrowley).
 
 A free, 100% client-side guitar tuner and intonation wizard that runs entirely
 in your browser. It pairs a hand-drawn analog VU meter with precise pitch
@@ -9,12 +9,12 @@ wizard walks you through setting your intonation properly — saddle by saddle �
 instead of just telling you a string is flat. No accounts, no uploads, no
 tracking: audio never leaves your device.
 
-**Live:** https://intonate.availfind.com/
+**Live:** https://tuneomatic.app/
 
 ## Screenshots
 
-![Tuner, dark mode](assets/shot-tuner-dark.png)
-![Intonation wizard, dark mode](assets/shot-wizard-dark.png)
+![Tuner, dark mode](readme_img/shot-tuner-dark.png)
+![Intonation wizard, dark mode](readme_img/shot-wizard-dark.png)
 
 ## User manual
 
@@ -23,7 +23,7 @@ from the chips at the top, and pluck. The big needle shows how far off you are
 and the strobe ring freezes when you're in tune. That's it — the app handles
 the rest.
 
-![Tuner close-up](assets/shot-tuner-dark.png)
+![Tuner close-up](readme_img/shot-tuner-dark.png)
 
 **Set your intonation.** Open the **Intonation wizard** tab and follow it
 string by string: it asks for the open string, then the 12th-fret harmonic,
@@ -32,7 +32,7 @@ note is sharp it tells you to move the saddle back; if flat, forward — with a
 rough distance so you're not guessing. Repeat until the step goes green, then
 move to the next string.
 
-![Intonation wizard](assets/shot-wizard-dark.png)
+![Intonation wizard](readme_img/shot-wizard-dark.png)
 
 **Tweaks.** The gear icon opens Advanced Options (sensitivity, tolerances,
 theme, LED colour). Everything is optional; the defaults are good.

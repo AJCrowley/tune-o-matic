@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 """tune-o-matic origin server: plain file serving with Cache-Control: no-cache on
 everything, so manual or agent edits always propagate on the next hard refresh
-through the Cloudflare tunnel. intonate.service runs this."""
+through the Cloudflare tunnel. tuneomatic.service runs this."""
 import http.server, functools, os
 
-ROOT = "/home/crowley/projects/intonate"
+ROOT = "/home/crowley/projects/tuneomatic"
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
