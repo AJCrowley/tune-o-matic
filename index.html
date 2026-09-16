@@ -32,7 +32,7 @@
     --line: #d8cdb4;
     --fg: #2b2822;
     --fg-dim: #6b6252;
-    --fg-faint: #988e79;
+    --fg-faint: #87532c;
     --amber: #b3720f;
     --amber-dim: #8a5a0e;
     --green: #1a7f43;
@@ -66,14 +66,15 @@
 
   /* ---- meter face (raster art + overlay) ---- */
   .meterface { position: relative; max-width: 430px; margin: 14px auto 0; }
-  .meterface .face-img { width: 100%; display: block; border-radius: 6px; }
+  .meterface .face-img { width: 100%; display: block; filter: drop-shadow(0 0 8px rgba(0,0,0,0.75)); }
+  [data-theme="light"] .meterface .face-img { filter: drop-shadow(0 0 8px rgba(0,0,0,0.75)); }
   [data-theme="dark"] .face-img.light-only { display: none; }
   [data-theme="light"] .face-img.dark-only { display: none; }
   .meterface svg.gauge-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
   /* 7-seg LED note window, recessed into the face */
   .ledwin {
-    position: absolute; left: 43.0%; top: 79.17%; width: 13%; height: 11.3%;
+    position: absolute; left: 39.6%; top: 78%; width: 19.7%; height: 55px;
     background: linear-gradient(180deg, #100604, #1c0c06);
     border-radius: 6px; border: 1px solid rgba(0,0,0,.9);
     box-shadow: inset 0 3px 7px rgba(0,0,0,.95), inset 0 -1px 1px rgba(255,180,90,.10), 0 2px 3px rgba(0,0,0,.7);
@@ -94,6 +95,10 @@
     background-attachment: scroll;
     min-height: 100vh;
     -webkit-transform: translateZ(0);  /* force iOS repaint of the gradient after refresh */
+  }
+  [data-theme="light"] body {
+    background:
+      radial-gradient(1200px 500px at 50% -10%, #f8f1e0 0%, var(--bg) 60%) var(--bg);
     line-height: 1.55;
   }
   .wrap { max-width: 680px; margin: 0 auto; padding: 28px 18px 60px; }
@@ -120,8 +125,18 @@
   .tab .sub { display: block; font-size: 11px; font-weight: 400; color: var(--fg-faint); }
 
   .card {
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    background:
+      linear-gradient(rgba(29,32,38,0.45), rgba(29,32,38,0.45)),
+      url("bg-tile-dark.png") repeat top left / 588px 292px,
+      var(--panel);
+    border: 1px solid var(--line); border-radius: var(--radius);
     padding: 22px 22px 26px; margin-bottom: 16px;
+  }
+  [data-theme="light"] .card {
+    background:
+      linear-gradient(rgba(245,239,226,0.40), rgba(245,239,226,0.40)),
+      url("bg-tile-light.png") repeat top left / 588px 294px,
+      var(--panel);
   }
   @media (max-width: 480px) { .card { padding: 18px 16px 22px; } }
 
@@ -252,6 +267,21 @@
 
   .cfgrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 480px) { .cfgrow { grid-template-columns: 1fr; } }
+
+  /* Landscape phones: stack the tuner column (meter on top, full width of the
+     card) instead of the unusable side-by-side row; meter shrinks to fit the
+     short viewport but is never cropped. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    .tuner { display: flex; flex-direction: column; align-items: center; }
+    .meterface { max-width: 230px; margin: 4px auto 0; }
+    .readout { margin-top: 2px; }
+    .cents { font-size: 30px; }
+    .steplabel { margin-bottom: 4px; }
+    .card { padding: 12px 14px 16px; margin-bottom: 10px; }
+    .wrap { padding: 14px 14px 40px; }
+    .tabs { margin-bottom: 10px; }
+    h2 { font-size: 16px; }
+  }
 </style>
 </head>
 <body>
@@ -274,8 +304,8 @@
         <li><strong>The intonation wizard</strong> walks you through every step — "play the open string… now the 12th-fret harmonic… now fretted… it reads 6¢ sharp, so lengthen the string" — and iterates until every string converges.</li>
       </ul>
       <div class="btnrow">
+        <button class="btn big" id="btnStartTuner">Open the app</button>
         <button class="btn big" id="btnStartWizard">Run the tutorial</button>
-        <button class="btn ghost big" id="btnStartTuner">Open the app</button>
         <button class="btn ghost" id="btnResume" style="display:none">Resume wizard session</button>
       </div>
       <p class="sub" style="margin-top:8px">The tutorial is fully simulated — no microphone, no audio access, nothing to plug in. Just watch the meter and follow along.</p>
@@ -308,7 +338,7 @@
       <label class="lbl" for="selGuitar">Guitar</label>
       <select id="selGuitar" class="sel">
         <option value="4">4-string (bass, mandolin, ukulele)</option>
-        <option value="6">6-string</option>
+        <option value="6" selected>6-string</option>
         <option value="7">7-string</option>
         <option value="12">12-string</option>
       </select>
@@ -552,6 +582,9 @@ const CFG = {
   pass_tol_cents: 3,           // wizard: fretted-vs-harmonic "done" tolerance
   excellent_tol_cents: 1.5,    // wizard: bragging-rights tolerance
   ghost_guard_ms: 1200,        // ring-out pause after harmonic capture
+  needle_snap: 0.58,           // spring: easing step toward target (0..1, higher = firmer)
+  needle_kick: 2.4,            // velocity cap (deg/frame): full-swing rightward ≈0.55s, leftward ≈0.9s
+  needle_friction: 0.90,       // velocity retained per frame (lower = heavier drag; the "physical" feel)
   min_freq_hz: 50,             // pitch detection floor (50 = drop A 7-string)
   max_freq_hz: 1600,           // pitch detection ceiling
   yin_threshold: 0.13,         // YIN periodicity threshold (lower = more permissive)
@@ -1232,27 +1265,61 @@ function renderWizardStatic() {
 }
 
 /* ---------- UI: gauges (aligned to raster meter art, viewBox 605x600) ---------- */
-/* ---------- UI: gauges (aligned to raster meter art, viewBox 605x600) ---------- */
-const MX = 302.5, MY = 408;      // needle origin: centre, 408px down the artwork (Kris-specified)
-const LED_RC_X = 298.1, LED_RC_Y = 310.0;  // strobe-ring centre: circle THROUGH the 3 rivet centres (measured)
-const LED_RR = 256.6;              // ring radius: intersects the rivets at their centres exactly
-const RIVET_ANG = [270.6, 150.4, 29.4];    // rivet angles on the ring (deg; 0 = 3 o'clock)
-const LV_DOT_XS = [262.2, 274.5, 286.5, 298.6, 310.5, 321.7, 334.0];  // the artwork's 7 gray dots
-const LV_DOT_Y = 465.2;                       // (measured) — lit overlays drawn exactly on them
+const MX = 300, MY = 410;        // needle origin: brass bearing centre, v2 art (Kasa fits + blob agree, 2026-09-15)
+const LED_RC_X = 297.0, LED_RC_Y = 312.4;  // strobe-ring centre: circle THROUGH the 3 rivet centres (v2 mean, both themes)
+const LED_RR = 255.3;              // ring radius: intersects the rivets at their centres exactly (v2 mean)
+const RIVET_ANG = [270.3, 151.1, 29.3];    // rivet angles on the ring (deg; 0 = 3 o'clock) — v2 measured
+const LV_DOT_XS = [261.9, 274.0, 286.1, 298.2, 310.0, 322.0, 333.9];  // the artwork's 7 gray dots (v2 light row)
+const LV_DOT_Y = 456.0;                       // v2 dot row (was 465.2 in v1 art)
 const LV_DOT_COLS = ["#4ade80", "#4ade80", "#4ade80", "#4ade80", "#e8a33d", "#ef8d53", "#f87171"];
                                    // per-dot colour fixed by position, same ramp as the level bar
 const BLADE_R = 273;               // tip radius: reaches toward the dial edge; beyond ~62 deg deflection
                                    // the tip passes BEHIND the LED ring (ring drawn after the needle)
-const SWEEP_P = 68.73, SWEEP_N = 69.72;    // degrees each side: outer edge rests against the stop screws'
-                                   // outer surface (+0.5px clearance), re-solved 2026-09-13 from screw
-                                   // centres (108.5,-17) & (-113.5,-17) from origin — art (411,391) &
-                                   // (189,391), measured from the dark art (tops y374); screw r=17,
-                                   // blade taper half-width 5.3 at that radius
-const MECH_CLIP = "M 215 445 L 215 411 L 220 409 L 225 409 L 230 409 L 235 389 L 240 373 L 245 364 L 250 358 L 255 353 L 260 349 L 265 345 L 270 342 L 275 340 L 280 339 L 285 337 L 290 337 L 295 336 L 300 336 L 305 336 L 310 337 L 315 338 L 320 339 L 325 341 L 330 343 L 335 346 L 340 350 L 345 354 L 350 360 L 355 367 L 360 377 L 365 407 L 370 409 L 375 410 L 380 410 L 385 413 L 385 445 Z";
-                                   // movement-housing silhouette (measured): the needle base hides
-                                   // behind the housing; the brass screw caps it at (302.5,390) r~12
+const SWEEP_P = 66.70, SWEEP_N = 66.80;    // degrees each side: outer edge rests against the stop screws'
+                                   // outer surface (+0.5px clearance), re-solved 2026-09-15 for the v2 art:
+                                   // screws (402.3,390.7) r17.0 & (196.7,391.0) r17.5, taper-aware
+                                   // blade half-width 5.48/5.45 at contact; solver validated by
+                                   // reproducing the v1 art's 68.73/69.72 from its documented geometry
+const MECH_CLIP = "M 213 447 L 213 403 L 220 402 L 228 402 L 235 399 L 245 397 L 355 397 L 365 399 L 372 402 L 380 404 L 387 407 L 387 447 Z M 277 410 a 23 23 0 1 0 46 0 a 23 23 0 1 0 -46 0";
+                                   // needle base hidden: bottom band behind the plate + the jewel ball
+                                   // (300,410) r23 — blade visibly plunges INTO the bearing (v2 art)
 /* asymmetric stops: positive and negative sides have their own sweep angles */
 function fracToAngle(frac) { return frac >= 0 ? frac * SWEEP_P : frac * SWEEP_N; }
+/* ---------- needle spring: tweened movement, not a frame jump ----------
+   The blade is meant to read as a real d'Arsonval movement (Kris): it is never
+   teleported. A single tween loop eases the displayed angle toward the last
+   commanded angle: ease-OUT rightward (fast attack onto a rise, like a real
+   movement slamming onto an increase), ease-IN leftward (slow release off it),
+   plus a small damped overshoot rightward for physicality. setNeedle only
+   records the target; the RAF loop below animates. Demo mode still drives
+   absolute angles through the same path. */
+const NEEDLE_IDS = ["needle", "needleT"];
+const tweens = {};   // id -> {cur, target, vel}
+for (const id of NEEDLE_IDS) tweens[id] = { cur: 0, target: 0, vel: 0 };   // seeded: spring owns needles from boot
+function needleTweenInit(id) { if (!tweens[id]) tweens[id] = { cur: 0, target: 0, vel: 0 }; return tweens[id]; }
+function needleTick() {
+  for (const id of NEEDLE_IDS) {
+    const tw = tweens[id]; if (!tw) continue;
+    const grp = document.getElementById(id + "Grp");
+    if (!grp) continue;
+    const to = tw.target - tw.cur;
+    if (Math.abs(to) < 0.02 && Math.abs(tw.vel) < 0.05) {
+      if (tw.cur !== tw.target) { tw.cur = tw.target; grp.setAttribute("transform", `rotate(${tw.target.toFixed(2)} ${MX} ${MY})`); }
+      continue;
+    }
+    const goingRight = to > 0 || (to === 0 && tw.vel > 0);
+    // ease-out right (fast attack, cap allows a lively arrival), ease-in left (deliberate release)
+    const step = goingRight ? CFG.needle_snap : CFG.needle_snap * 0.55;
+    const kick = goingRight ? CFG.needle_kick : CFG.needle_kick * 0.62;
+    tw.vel = tw.vel * CFG.needle_friction + to * step;
+    tw.vel = Math.max(-kick, Math.min(kick, tw.vel));
+    tw.cur += tw.vel;
+    if ((to > 0 && tw.cur > tw.target) || (to < 0 && tw.cur < tw.target)) tw.cur = tw.target;  // never passes the target leftward
+    grp.setAttribute("transform", `rotate(${tw.cur.toFixed(2)} ${MX} ${MY})`);
+  }
+  requestAnimationFrame(needleTick);
+}
+requestAnimationFrame(needleTick);
 function polarArt(r, frac) {
   const th = (-90 + fracToAngle(frac)) * Math.PI / 180;
   return [MX + r * Math.cos(th), MY + r * Math.sin(th)];
@@ -1292,6 +1359,7 @@ function buildGaugeInto(svgEl, needleId) {
     </linearGradient>
     <filter id="${needleId}Blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.4"/></filter>
     <filter id="${needleId}Glow" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="2.6"/></filter>
+    <filter id="${needleId}Glare" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="4.5"/></filter>
     <radialGradient id="${needleId}Bevel">
       <stop offset="0.50" stop-color="#141110"/>
       <stop offset="0.62" stop-color="#4a4238"/>
@@ -1357,6 +1425,7 @@ function buildGaugeInto(svgEl, needleId) {
       `<circle class="domeon" r="5.6" fill="url(#${needleId}OnR)" opacity="0"/>` +
       `<circle class="gloss" r="5.6" fill="url(#${needleId}OffGloss)"/>` +
       `<circle class="bloom" r="8.5" fill="#e3250f" opacity="0" filter="url(#${needleId}Glow)"/>` +
+      `<circle class="glare" r="15" fill="#e3250f" opacity="0" filter="url(#${needleId}Glare)"/>` +
       `<ellipse cx="-1.6" cy="-2.2" rx="2.1" ry="1.5" fill="rgba(255,255,255,0.30)"/>` +
       `</g>`;
   }
@@ -1371,7 +1440,9 @@ function setNeedle(svgNeedle, c, tol) {
   // one group holds shadow+blade+highlight+bevel: a single attribute write per frame,
   // so the needle can never paint as two pieces mid-rotation
   const grp = document.getElementById(id + "Grp");
-  if (grp) grp.setAttribute("transform", `rotate(${ang.toFixed(2)} ${MX} ${MY})`);
+  const tw = tweens[id];
+  if (grp && tw) tw.target = ang;      // spring loop moves the group
+  else if (grp) grp.setAttribute("transform", `rotate(${ang.toFixed(2)} ${MX} ${MY})`);
   else {  // fallback (shouldn't happen): move the parts together
     const rot = `rotate(${ang.toFixed(2)} ${MX} ${MY})`;
     for (const part of ["", "Shadow", "Hi", "Lo"]) {
@@ -1404,8 +1475,22 @@ function updateStrobeRing(needleId, c) {
     if (d < activeCount) glow = 1 - d / activeCount;
     const dome = dot.querySelector(".domeon");
     const bloom = dot.querySelector(".bloom");
+    const glare = dot.querySelector(".glare");
     if (dome) { dome.setAttribute("fill", `url(#${needleId}${grad})`); dome.setAttribute("opacity", glow.toFixed(2)); }
     if (bloom) { bloom.setAttribute("fill", base); bloom.setAttribute("opacity", (glow * 0.55).toFixed(2)); }
+    if (glare) { glare.setAttribute("fill", base); glare.setAttribute("opacity", (glow * 0.38).toFixed(2)); }
+  }
+  // mobile glare boost: lamps are physically small on phones, so the lit ones
+  // burn hotter — same design language, higher intensity
+  const small = matchMedia("(max-width: 640px)").matches || (navigator.maxTouchPoints > 1 && innerWidth < 900);
+  for (let i = 0; i < N; i++) {
+    const dot = document.getElementById(needleId + "Led" + i);
+    if (!dot) continue;
+    const dome = dot.querySelector(".domeon");
+    if (dome && small) {
+      const g = parseFloat(dome.getAttribute("opacity") || "0");
+      dome.setAttribute("opacity", Math.min(1, g * 1.55).toFixed(2));
+    }
   }
 }
 /* ---------- 7-segment LED display ---------- */
@@ -1503,7 +1588,7 @@ function updateReadout(med, tgt, lock) {
     ledSet(document.getElementById("led7"), noteToLed(med));
   } else {
     const nd = document.getElementById("needleGrp");
-    if (nd) nd.setAttribute("transform", `rotate(0 ${MX} ${MY})`);
+    if (nd && tweens["needle"]) tweens["needle"].target = 0;   // spring glides it home — friction keeps it smooth
     updateStrobeRing("needle", 0);
     big.textContent = "–";
     big.style.color = "var(--fg-dim)";
@@ -1538,7 +1623,7 @@ function updateReadoutT(med, tgt, idx, lock) {
     ledSet(document.getElementById("led7T"), noteToLed(med));
   } else {
     const nd = document.getElementById("needleTGrp");
-    if (nd) nd.setAttribute("transform", `rotate(0 ${MX} ${MY})`);
+    if (nd && tweens["needleT"]) tweens["needleT"].target = 0;   // spring glides it home
     updateStrobeRing("needleT", 0);
     big.textContent = "–";
     big.style.color = "var(--fg-dim)";
@@ -1940,7 +2025,7 @@ window.addEventListener("pageshow", (e) => { window.scrollTo(0, 0); });
     nearest: nearestString,
     tunerTrack: tunerTrack,
     renderTunerChips: renderTunerChips,
-    cfg: CFG,
+    cfg: CFG, tweens: tweens,
   };
   });
 })();

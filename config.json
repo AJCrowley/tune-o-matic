@@ -1,5 +1,5 @@
 {
-  "_comment": "Intonate tunables. Delete a key to fall back to the built-in default. Edits take effect on next page load — no service restart needed. Sensitivity presets in the app (High/Normal/Low) override rms_gate and median_frames while selected.",
+  "_comment": "Intonate tunables. Delete a key to fall back to the built-in default. Edits take effect on next page load \u2014 no service restart needed. Sensitivity presets in the app (High/Normal/Low) override rms_gate and median_frames while selected.",
   "theme": "dark",
   "led_color": "#ff2a1a",
   "rms_gate": 0.0008,
@@ -8,6 +8,7 @@
   "stable_spread_cents": 10,
   "capture_window_cents": 60,
   "in_tune_tol_cents": 3,
+  "needle_friction": 0.9,
   "tune_tol_cents": 4,
   "harmonic_tol_cents": 8,
   "pass_tol_cents": 3,
