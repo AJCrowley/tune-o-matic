@@ -773,9 +773,11 @@ const SWEEP_P = 66.70, SWEEP_N = 66.80;    // degrees each side: outer edge rest
                                    // screws (402.3,390.7) r17.0 & (196.7,391.0) r17.5, taper-aware
                                    // blade half-width 5.48/5.45 at contact; solver validated by
                                    // reproducing the v1 art's 68.73/69.72 from its documented geometry
-const MECH_CLIP = "M 213 447 L 213 403 L 220 402 L 228 402 L 235 399 L 245 397 L 355 397 L 365 399 L 372 402 L 380 404 L 387 407 L 387 447 Z M 277 410 a 23 23 0 1 0 46 0 a 23 23 0 1 0 -46 0";
-                                   // needle base hidden: bottom band behind the plate + the jewel ball
-                                   // (300,410) r23 — blade visibly plunges INTO the bearing (v2 art)
+const MECH_CLIP = "M 266 409 a 34 34 0 1 0 68 0 a 34 34 0 1 0 -68 0";
+                                   // needle base hidden: ONE circular mask per Kris's re-measure
+                                   // (2026-09-17): centre (300,409) r34 — top edge lands at y=375,
+                                   // identical for both themes. Blade visibly plunges INTO the bearing.
+                                   // (300,409) r34 — blade visibly plunges INTO the bearing (v2 art)
 /* asymmetric stops: positive and negative sides have their own sweep angles */
 function fracToAngle(frac) { return frac >= 0 ? frac * SWEEP_P : frac * SWEEP_N; }
 /* ---------- needle spring: tweened movement, not a frame jump ----------
